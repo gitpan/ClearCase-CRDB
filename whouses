@@ -22,28 +22,28 @@ Usage: $prog [flags] pattern ...
 Flags:
    -help		Print this message and exit
    -backwards		Work from objects back towards sources
-   -check		(with -cr) Check specified DO's for consistency
-   -cr DO,...		Comma-separated list of DO's to dump in the CRDB
+   -check		(with -do) Check specified DO's for consistency
+   -do DO,...		Comma-separated list of DO's to analyze
    -db file,...		Comma-separated list of *.crdb files to read in
    -dir	<dir>		Dir to search for *.crdb files (default: the cwd)
    -exact		Treat <pattern> as an absolute path, not a pattern
    -indent <str>	String to indent recursive output (default: 3 spaces)
    -recurse		Chase down dependencies recursively
-   -save		(with -cr) Save DB resulting from DO 'foo' as 'foo.crdb'
+   -save		(with -do) Save DB resulting from DO 'foo' as 'foo.crdb'
    -terminals		Like -recurse but print only terminal targets
    -verbose		Provide informational messages
 Note:
     All flags may be abbreviated to their shortest unique name.
 Examples:
-    $prog -cr /vobs_foo/solaris/.AUDIT libxyz.a
+    $prog -do /vobs_foo/solaris/.AUDIT libxyz.a
     $prog -backwards -rec foo.o
 EOF
     exit $rc;
 }
 
 my %opt;
-GetOptions(\%opt, qw(backwards check cr=s@ db=s@ dir=s exact fmt=s help
-		     indent=s macro recurse save terminals verbose));
+GetOptions(\%opt, qw(backwards check do|cr=s@ db=s@ dir=s exact fmt=s help
+		     indent=s macro number recurse save terminals verbose));
 usage() if $opt{help};
 
 sub note {
@@ -60,8 +60,8 @@ my $fmt = 'ClearCase::CRDB::' . ($opt{fmt} || 'Dumper');
 eval "require $fmt";
 my $cr = $fmt->new;
 
-if ($opt{cr} || $ENV{CRDB_DO}) {
-    my $crlist = $opt{cr} ? join(',', @{$opt{cr}}) : $ENV{CRDB_DO};
+if ($opt{do} || $ENV{CRDB_DO}) {
+    my $crlist = $opt{do} ? join(',', @{$opt{do}}) : $ENV{CRDB_DO};
     my @crs = map {split /[$delim]/} $crlist;
     $cr->crdo(@crs);
     if ($opt{check}) {
@@ -101,6 +101,7 @@ if ($opt{cr} || $ENV{CRDB_DO}) {
 $opt{indent} ||= '   ';
 
 my @matches;
+my $ln = '';
 
 {
     my %seen;
@@ -122,7 +123,8 @@ my @matches;
 	    if ($opt{terminals} && grep !m%/\.AUDIT%i, $cr->$query($used)) {
 		whouses($level, $used);
 	    } else {
-		print "$pad$used\n" unless $opt{terminals} && $seen{$used};
+		++$ln if $opt{number};
+		print "$ln$pad$used\n" unless $opt{terminals} && $seen{$used};
 		$seen{$used} = 1;
 		whouses($level+1, $used) if $opt{recurse};
 	    }
@@ -131,6 +133,7 @@ my @matches;
 }
 
 for (@matches) {
+    print(++$ln, ' ') if $opt{number};
     print $_, $opt{backwards} ? ' <=' : ' =>', "\n";
     whouses(1, $_);
 }
@@ -170,9 +173,8 @@ exact file.
 
 B<Whouses> provides a limited form of "impact analysis" in a clearmake
 build environment. This is different from traditional impact analysis
-(see B<TRUE CODE ANALYSIS COMPARED> below for details) and in
-particular operates at the granularity of files rather than language
-elements.
+(see B<TRUE CODE ANALYSIS COMPARED> below for details). In particular,
+it operates at the granularity of files rather than language elements.
 
 Whouses is best described by example. Imagine you have a VOB
 F</vobs_sw> in which you build the incredibly simple application C<foo>
@@ -180,15 +182,15 @@ from C<foo.c>.  You have a Makefile which compiles C<foo.c> to C<foo.o>
 and then links it to produce C<foo>. And let's further assume you've
 just done a build using clearmake.
 
-Now, C<foo> is a DO which has a config record ("CR") showing how it was
-made. Whouses analyzes that CR and prints the data in easy-to-read
+Thus, C<foo> is a DO which has a config record ("CR") showing how it
+was made. Whouses analyzes that CR and prints the data in easy-to-read
 indented textual format.  For instance:
 
-	% whouses -cr foo foo.c
+	% whouses -do foo foo.c
 	/vobs_sw/src/foo.c  =>
 	  /vobs_sw/src/foo.o
 
-The "-cr foo" points to the derived object from which to extract and
+The "-do foo" points to the derived object from which to extract and
 analyze the CR; it will be implicit in the remaining examples.  The
 output indicates that C<foo.o B<uses> foo.c>, or in other words that
 C<foo.c> is a contributor to C<foo.o>. If we add the C<-recurse> flag:
@@ -235,15 +237,17 @@ And discover that C<foo.h> and C<bar.h> were also used.
 When used recursively in the forward direction, this script answers the
 question "if I change file X, which derived files will need to be
 rebuilt"? This is the classic use, the one for which it was written.
+When used recursively in the backward direction it can depict the
+entire dependency tree in a readable format.
 
 Because extracting a recursive CR can be quite slow for large build
 systems, whouses provides ways of dumping the CR data to a file
 representation for speed. Use of C<-save>:
 
-	% whouses -cr foo -save ...
+	% whouses -do foo -save ...
 
 will write out the data to F<foo.crdb>. Subsequently, if F<foo.crdb>
-exists it will be used unless a new the C<-cr> flag is used.  See also
+exists it will be used unless a new the C<-do> flag is used.  See also
 the C<-db> and C<-fmt> flags.
 
 The default save format is that of B<Data::Dumper>. It was chosen
@@ -256,11 +260,11 @@ actual, fast database to be used.
 
 =head1 SELECTING CONFIG RECORDS
 
-If a C<-cr> flag is given, the CRs are taken from the specified derived
-object(s).  Multiple DO's may be specified with multiple C<-cr> flags
+If a C<-do> flag is given, the CRs are taken from the specified derived
+object(s).  Multiple DO's may be specified with multiple C<-do> flags
 or as a comma-separated list. Alternatively, if the C<CRDB_DO>
 environment variable exists, its value is used as if specific with
-C<-cr>.
+C<-do>.
 
 If no DO's are specified directly, C<whouses> will look for stored DO
 data in files specified with C<-db> or the C<CRDB_DB> EV. The format is

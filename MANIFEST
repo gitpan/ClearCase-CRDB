@@ -1,6 +1,7 @@
 Changes
 MANIFEST
 README
+WHOUSES.html
 Makefile.PL
 lib/ClearCase/CRDB.pm
 lib/ClearCase/CRDB/Dumper.pm
@@ -11,4 +12,13 @@ t/crdba.c
 t/crdbb.c
 t/crdbc.c
 t/Makefile
+t/macros.mk
 t/dumper.t
+t/recu/Makefile
+t/recu/README
+t/recu/r1/Makefile
+t/recu/r1/r1a.c
+t/recu/r1/r1b.c
+t/recu/r2/Makefile
+t/recu/r2/r2a.c
+t/recu/r2/r2b.c

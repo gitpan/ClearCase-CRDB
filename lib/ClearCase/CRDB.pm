@@ -1,6 +1,6 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 require 5.6.0;
 
@@ -79,8 +79,8 @@ sub catcr {
 	if ($state == $Notes) {
 	    push(@notes, $_);
 	    if (my($base) = m%^Initial working directory was (\S+)%) {
-		$self->iwd($base) unless $self->iwd;
 		my $full = File::Spec::Unix->rel2abs($tgt, $base);
+		$self->iwd($full, $base);
 		if (-e $full) {
 		    $tgt = $full;
 		} else {
@@ -92,7 +92,7 @@ sub catcr {
 	    if (($path, $vers, $date) = m%^([/\\].+)@@(\S+)\s+<(\S+)>$%) {
 		for ($path, $vers) { s%\\%/%g };
 		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'ELEM';
-		$self->{CRDB_FILES}->{$path}->{CR_VERS} = $vers;
+		$self->{CRDB_FILES}->{$path}->{CR_ELEM}->{CR_VERS} = $vers;
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
 	    } elsif (($path, $date) = m%^([/\\].+)@@(\S+)$%) {
 		$path =~ s%\\%/%g;
@@ -178,8 +178,20 @@ sub load {
 
 sub iwd {
     my $self = shift;
-    $self->{CRDB_IWD} = shift if @_;
-    return $self->{CRDB_IWD};
+    if (@_ == 2) {
+	my($path, $iwd) = @_;
+	$self->{CRDB_FILES}->{$path}->{CR_DO}->{CR_IWD} = $iwd;
+    } elsif (@_ == 1) {
+	my($path) = @_;
+	return $self->{CRDB_FILES}->{$path}->{CR_DO}->{CR_IWD};
+    } elsif (@_ == 0) {
+	my %iwds;
+	for (keys %{$self->{CRDB_FILES}}) {
+	    $iwds{$_} = $self->{CRDB_FILES}->{$_}->{CR_DO}->{CR_IWD};
+	}
+	return sort keys %iwds;
+    }
+    return undef;
 }
 
 sub files {
@@ -397,7 +409,9 @@ dependencies".
 
 =item * iwd
 
-Returns the directory marked as "Initial working directory" in the CR.
+Each target in a CR has an "initial working directory" or I<iwd>. If
+passed a DO, this method returns the I<iwd> of that derived object.
+With no parameters it returns the list of I<iwds> mentioned in the CR.
 
 =item * files
 

@@ -39,7 +39,7 @@ unlink '.cmake.state';
 my $tgt = 'prog1';
 
 # Test direct analysis from CR ...
-$final += printok(!system("$^X ../whouses -cr $tgt -r -b $tgt"));
+$final += printok(!system("$^X ../whouses -do $tgt -r -b $tgt"));
 exit $final if $final;
 
 my $cr = ClearCase::CRDB::Dumper->new;

@@ -12,7 +12,8 @@ WriteMakefile(
 	COMPRESS	=>   'gzip --force --best',
 	TAR		=>   'gtar',
 	TARFLAGS	=>   '--mode=u+w -cvf',
-	PREOP		=>   "pod2text whouses > README",
+	PREOP		=>   'pod2text whouses > README; ' .
+				 'pod2html whouses > WHOUSES.html',
 	POSTOP	 	=>   'rm -f pod2html-*cache',
     },
 );

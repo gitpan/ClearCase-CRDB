@@ -25,7 +25,7 @@ SYNOPSIS
 DESCRIPTION
     Whouses provides a limited form of "impact analysis" in a clearmake
     build environment. This is different from traditional impact analysis
-    (see TRUE CODE ANALYSIS COMPARED below for details) and in particular
+    (see TRUE CODE ANALYSIS COMPARED below for details). In particular, it
     operates at the granularity of files rather than language elements.
 
     Whouses is best described by example. Imagine you have a VOB /vobs_sw in
@@ -34,15 +34,15 @@ DESCRIPTION
     to produce "foo". And let's further assume you've just done a build
     using clearmake.
 
-    Now, "foo" is a DO which has a config record ("CR") showing how it was
+    Thus, "foo" is a DO which has a config record ("CR") showing how it was
     made. Whouses analyzes that CR and prints the data in easy-to-read
     indented textual format. For instance:
 
-            % whouses -cr foo foo.c
+            % whouses -do foo foo.c
             /vobs_sw/src/foo.c  =>
               /vobs_sw/src/foo.o
 
-    The "-cr foo" points to the derived object from which to extract and
+    The "-do foo" points to the derived object from which to extract and
     analyze the CR; it will be implicit in the remaining examples. The
     output indicates that "foo.o uses foo.c", or in other words that "foo.c"
     is a contributor to "foo.o". If we add the "-recurse" flag:
@@ -89,15 +89,17 @@ DESCRIPTION
     When used recursively in the forward direction, this script answers the
     question "if I change file X, which derived files will need to be
     rebuilt"? This is the classic use, the one for which it was written.
+    When used recursively in the backward direction it can depict the entire
+    dependency tree in a readable format.
 
     Because extracting a recursive CR can be quite slow for large build
     systems, whouses provides ways of dumping the CR data to a file
     representation for speed. Use of "-save":
 
-            % whouses -cr foo -save ...
+            % whouses -do foo -save ...
 
     will write out the data to foo.crdb. Subsequently, if foo.crdb exists it
-    will be used unless a new the "-cr" flag is used. See also the "-db" and
+    will be used unless a new the "-do" flag is used. See also the "-db" and
     "-fmt" flags.
 
     The default save format is that of Data::Dumper. It was chosen because
@@ -109,10 +111,10 @@ DESCRIPTION
     database to be used.
 
 SELECTING CONFIG RECORDS
-    If a "-cr" flag is given, the CRs are taken from the specified derived
-    object(s). Multiple DO's may be specified with multiple "-cr" flags or
+    If a "-do" flag is given, the CRs are taken from the specified derived
+    object(s). Multiple DO's may be specified with multiple "-do" flags or
     as a comma-separated list. Alternatively, if the "CRDB_DO" environment
-    variable exists, its value is used as if specific with "-cr".
+    variable exists, its value is used as if specific with "-do".
 
     If no DO's are specified directly, "whouses" will look for stored DO
     data in files specified with "-db" or the "CRDB_DB" EV. The format is
