@@ -21,3 +21,6 @@ Revision history for Perl extension ClearCase::CRDB.
 
 0.07 Sat Oct 27 21:37:12 EDT 2001
 	- Added 'schema' number to deal with potential future reorgs.
+
+0.08 Tue Jan  8 08:16:12 EST 2002
+	- Allow Perl 5.005 - said to pass tests by a user.

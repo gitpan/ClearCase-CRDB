@@ -40,7 +40,7 @@ unlink '.cmake.state';
 my $tgt = 'prog1';
 
 # Test direct analysis from CR ...
-$final += printok(!system("$^X ../whouses -do $tgt -r -b $tgt"));
+$final += printok(!system("$^X -Mblib ../whouses -do $tgt -r -b $tgt"));
 exit $final if $final;
 
 my $cr = ClearCase::CRDB::Dumper->new;
@@ -52,7 +52,7 @@ $cr->store("$tgt.crdb");
 $final += printok(-e "$tgt.crdb");
 
 # Test analysis from cached CR DB ...
-$final += printok(!system("$^X ../whouses -db $tgt -fmt Dumper -r -b $tgt"));
+$final += printok(!system("$^X -Mblib ../whouses -db $tgt -fmt Dumper -r -b $tgt"));
 exit $final if $final;
 
 #print ERR "A sample of the CRDB format has been left in t/prog1.crdb ...\n";

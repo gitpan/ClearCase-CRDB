@@ -1,12 +1,14 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 
-# This is stored in the flat-file form via ->store and compared during
-# ->load. A warning is issued if they don't match.
+# This schema version is stored in the flat-file form via ->store
+# and compared during ->load. A warning is issued if they don't match.
 my $mod_schema = 1;
 
-require 5.6.0;
+# I don't know exactly what Perl version is the minimum required but I
+# have a report that it works with 5.005. I use 5.6.1 myself.
+require 5.005;
 
 use File::Spec 0.82;
 
@@ -19,7 +21,7 @@ eval { require ClearCase::CRDB::Storable; };
 
 use strict;
 
-use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i;
+use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 
 sub new {
     my $proto = shift;
@@ -317,6 +319,7 @@ ClearCase::CRDB - base class for ClearCase config-record analysis
     my $crdb = ClearCase::CRDB->new(@ARGV);	# @ARGV is a list of DO's
     $crdb->check;				# Do a CR sanity check
     $crdb->catcr;				# Analyze the recursive CR
+    $crdb->store($filename);			# Dump CR to $filename
 
 =head1 DESCRIPTION
 
@@ -333,7 +336,7 @@ I<whouses> script which, given a particular DO, can show recursively
 which files it depends on or which files depend on it.
 
 Since recursively deriving a CR database can be a slow process for
-large build systems, and can burden the VOB database, the methods
+large build systems and can burden the VOB database, the methods
 C<ClearCase::CRDB-E<gt>store> and C<ClearCase::CRDB-E<gt>load> are
 provided. These allow the derived CR data to be stored in its processed
 form to a persistent storage such as a flat file or database and
@@ -346,7 +349,8 @@ C<ClearCase::CRDB-E<gt>load> methods store to a flat file in
 human-readable text format. Different formats may be used by
 subclassing these two methods. An example subclass
 C<ClearCase::CRDB::Storable> is provided; this uses the Perl module
-I<Storable> which is a binary format.
+I<Storable> which is a binary format. If you wanted to store to a
+database this is how you'd do it.
 
 =head2 CONSTRUCTOR
 
@@ -360,10 +364,10 @@ Following is a brief description of each supported method. Examples
 are given for all methods that take parameters; if no example is
 given usage may be assumed to look like:
 
-    $obj->method;
+    my $result = $obj->method;
 
 Also, if the return value is described in plural terms it may be
-assumed this means a list.
+assumed that the method returns a list.
 
 =over 4
 
@@ -476,7 +480,7 @@ David Boyce <dsb@boyski.com>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000,2001 David Boyce. All rights reserved.  This Perl
+Copyright (c) 2000-2002 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute and/or modify it under
 the same terms as Perl itself.
 
@@ -491,11 +495,18 @@ to leave the interface alone.
 
 This module has been at least slightly tested, at various points in its
 lifecycle, on almost all CC platforms including Solaris 2.6-8, HP-UX 10
-and 11, and Windows NT4 and Win2K SP2 using perl 5.004_04 and 5.6.0.
-However, the code does a I<require 5.6.0> since I no longer test with
-anything earlier.
+and 11, and Windows NT4 and Win2K SP2 using perl 5.004_04 through 5.6.1
+and CC4.1 through 5.0.  However, I tend to use the latest of everything
+(CC5.0, Solaris8, Win2KSP2, Perl5.6.1 at this writing) and cannot
+regression-test with anything earlier.
 
 =head1 BUGS
+
+NOTE: A bug in CC 5.0 causes CRDB's "make test" to dump core. This bug
+is in clearmake, not CRDB, and in any case affects only its test
+suite.  The first CC 5.0 patch contains a fix, so you probably don't
+want to use CC 5.0 unpatched. If you do, ignore the core dump in
+the test suite and force and install anyway.
 
 Please send bug reports or patches to the address above.
 
