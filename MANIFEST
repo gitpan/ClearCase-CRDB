@@ -1,0 +1,14 @@
+Changes
+MANIFEST
+README.html
+Makefile.PL
+lib/ClearCase/CRDB.pm
+lib/ClearCase/CRDB/Dumper.pm
+lib/ClearCase/CRDB/Denter.pm
+lib/ClearCase/CRDB/Storable.pm
+whouses
+t/crdba.c
+t/crdbb.c
+t/crdbc.c
+t/Makefile
+t/dumper.t
