@@ -19,6 +19,13 @@ ClearCase::CRDB::Dumper - text-format subclass of ClearCase::CRDB
 
 =head1 DESCRIPTION
 
+This is an empty subclass of ClearCase::CRDB provided for consistency.
+The native storage format of ClearCase::CRDB is that of Data::Dumper,
+so ClearCase::CRDB::Dumper need not override the -E<gt>load and
+-E<gt>store methods. However, other storage formats have their own
+subclasses (cf ClearCase::CRDB::Storable) so ClearCase::CRDB::Dumper is
+provided too. It has the same semantics as its base class.
+
 =head1 AUTHOR
 
 David Boyce <dsb@boyski.com>

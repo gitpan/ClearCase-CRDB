@@ -1,6 +1,6 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 require 5.6.0;
 

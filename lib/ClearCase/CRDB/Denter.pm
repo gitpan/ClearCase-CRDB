@@ -49,7 +49,17 @@ ClearCase::CRDB::Denter - Data::Denter format subclass of ClearCase::CRDB
 
 =head1 SYNOPSIS
 
+Same as base class.
+
 =head1 DESCRIPTION
+
+This subclass of ClearCase::CRDB overrides the
+I<ClearCase::CRDB-E<gt>load> and I<ClearCase::CRDB-E<gt>store> methods
+to use the Data::Denter format rather than the Data::Dumper format.  I
+know of no major advantage to Denter over Dumper in this application,
+though that's not to say there aren't any ... I only added this
+subclass to (a) test the extensibility of the base class and (b) learn
+a bit more about Data::Denter.
 
 =head1 AUTHOR
 

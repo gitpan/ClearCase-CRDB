@@ -1,6 +1,6 @@
 Changes
 MANIFEST
-README.html
+README
 Makefile.PL
 lib/ClearCase/CRDB.pm
 lib/ClearCase/CRDB/Dumper.pm

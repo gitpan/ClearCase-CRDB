@@ -267,7 +267,7 @@ market.  Typically, these work by parsing the source code into some
 representation which they can then analyze. It's a powerful technique
 but entails some tradeoffs:
 
-=head4 MINUSES
+=head3 MINUSES
 
 =over 4
 
@@ -302,7 +302,7 @@ analysis of that area can take place.
 
 =back
 
-=head4 PLUSES
+=head3 PLUSES
 
 =over 4
 

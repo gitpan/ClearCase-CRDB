@@ -46,7 +46,7 @@ Same as base class.
 This subclass of ClearCase::CRDB overrides the
 I<ClearCase::CRDB-E<gt>load> and I<ClearCase::CRDB-E<gt>store> methods
 to use the Storable format rather than the Data::Dumper format.
-Storable is believed to be faster, both to write and read, but the
+Storable is believed to be faster both to write and read, but the
 storage format is binary and thus not (easily) human readable.
 
 =head1 AUTHOR
