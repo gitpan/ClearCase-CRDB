@@ -16,6 +16,7 @@ require ClearCase::CRDB::Dumper;
 $final += printok(1);
 exit $final if $final;
 
+# Test for presence of ClearCase.
 if (system "cleartool pwd -h 2>&1") {
     print STDERR qq(
 
@@ -26,10 +27,25 @@ be able to work around this by modifying your PATH appropriately.
 ******************************************************************
 
 );
-    exit 0;
+    exit 1;
 }
 
-#open(ERR, '>&STDERR');
+# Test for view context.
+my $wview = qx(cleartool pwv -wdview -s 2>&1);
+if ($wview =~ /\* NONE \*/) {
+    print STDERR qq(
+
+******************************************************************
+The tests for ClearCase::CRDB must run within a view context.
+You should expand the module package within an MVFS directory
+and re-run the tests. The files need not be checked in; they
+may remain view private as long as they're in a view context.
+******************************************************************
+
+);
+    exit 1;
+}
+
 open(STDERR, ">&STDOUT");
 chdir('./t') || chdir('../t') || die "./t: $!";
 

@@ -24,3 +24,9 @@ Revision history for Perl extension ClearCase::CRDB.
 
 0.08 Tue Jan  8 08:16:12 EST 2002
 	- Allow Perl 5.005 - said to pass tests by a user.
+
+0.09 Fri Nov 22 14:09:55 EST 2002
+	- Fix test to insist on running within a view context.
+
+0.10 Tue Jul 22 10:48:02 EDT 2003
+	- Fixed contact data.

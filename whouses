@@ -263,7 +263,7 @@ actual, fast database to be used.
 If a C<-do> flag is given, the CRs are taken from the specified derived
 object(s).  Multiple DO's may be specified with multiple C<-do> flags
 or as a comma-separated list. Alternatively, if the C<CRDB_DO>
-environment variable exists, its value is used as if specific with
+environment variable exists, its value is used as if specified with
 C<-do>.
 
 If no DO's are specified directly, C<whouses> will look for stored DO
@@ -374,7 +374,7 @@ have taken place since, divergence is possible here too.
 
 =head1 AUTHOR
 
-David Boyce <dsb@boyski.com>
+David Boyce <dsbperl@cleartool.com>
 
 =head1 COPYRIGHT
 

@@ -1,6 +1,6 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.08';
+$VERSION = '0.10';
 
 # This schema version is stored in the flat-file form via ->store
 # and compared during ->load. A warning is issued if they don't match.
@@ -476,7 +476,7 @@ deliberate; they're experimental.
 
 =head1 AUTHOR
 
-David Boyce <dsb@boyski.com>
+David Boyce <dsbperl@cleartool.com>
 
 =head1 COPYRIGHT
 

@@ -63,7 +63,7 @@ a bit more about Data::Denter.
 
 =head1 AUTHOR
 
-David Boyce <dsb@boyski.com>
+David Boyce <dsbperl@cleartool.com>
 
 =head1 COPYRIGHT
 

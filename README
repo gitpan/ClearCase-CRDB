@@ -114,7 +114,7 @@ SELECTING DERIVED OBJECTS
     If a "-do" flag is given, the CRs are taken from the specified derived
     object(s). Multiple DO's may be specified with multiple "-do" flags or
     as a comma-separated list. Alternatively, if the "CRDB_DO" environment
-    variable exists, its value is used as if specific with "-do".
+    variable exists, its value is used as if specified with "-do".
 
     If no DO's are specified directly, "whouses" will look for stored DO
     data in files specified with "-db" or the "CRDB_DB" EV. The format is
@@ -196,7 +196,7 @@ TRUE CODE ANALYSIS COMPARED
     taken place since, divergence is possible here too.
 
 AUTHOR
-    David Boyce <dsb@boyski.com>
+    David Boyce <dsbperl@cleartool.com>
 
 COPYRIGHT
     Copyright (c) 2000-2001 David Boyce. All rights reserved. This Perl
