@@ -2,3 +2,9 @@ Revision history for Perl extension ClearCase::CRDB.
 
 0.01 Tue Sep  5 11:48:14 EDT 2000
 	- original version
+
+0.02 Mon Oct 15 20:53:05 EDT 2001
+	- Doc cleanup. No functional change.
+
+0.03 Mon Oct 15 23:40:44 EDT 2001
+	- Still tweaking docs.

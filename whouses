@@ -145,7 +145,7 @@ whouses - impact analysis in a clearmake build environment
 
 =head1 MOTTO
 
-I<You give me a clean CR, I'll give you a clean impact analysis.>
+B<You give me a clean CR, I'll give you a clean impact analysis.>
 
 =head1 SYNOPSIS
 
@@ -167,20 +167,20 @@ an absolute pathname).
 
 =head1 DESCRIPTION
 
-I<Whouses> provides a limited form of "impact analysis" in a clearmake
+B<Whouses> provides a limited form of "impact analysis" in a clearmake
 build environment. This is different from traditional impact analysis
 (see B<CLASSIC CODE ANALYSIS COMPARED> below for details) and in
 particular operates at the granularity of files rather than language
 elements.
 
-I<Whouses> is best described by example. Imagine you have a VOB
-'/vobs_sw' in which you build the incredibly simple application I<foo>
-from I<foo.c>.  You have a Makefile which compiles I<foo.c> to I<foo.o>
-and then links it to produce I<foo>. And let's further assume you've
+Whouses is best described by example. Imagine you have a VOB
+F</vobs_sw> in which you build the incredibly simple application C<foo>
+from C<foo.c>.  You have a Makefile which compiles C<foo.c> to C<foo.o>
+and then links it to produce C<foo>. And let's further assume you've
 just done a build using clearmake.
 
-Now, I<foo> is a DO which has a config record ("CR") showing how it was
-made. I<Whouses> analyzes that CR and prints the data in easy-to-read
+Now, C<foo> is a DO which has a config record ("CR") showing how it was
+made. Whouses analyzes that CR and prints the data in easy-to-read
 indented format.  For instance:
 
 	% whouses -cr foo foo.c
@@ -189,35 +189,35 @@ indented format.  For instance:
 
 The "-cr foo" points to the derived object from which to extract and
 analyze the CR; it will be implicit in the remaining examples.  The
-output indicates that I<foo.o B<uses> foo.c>, or in other words that
-I<foo.c> is a contributor to I<foo.o>. If we add the I<-recurse> flag:
+output indicates that C<foo.o B<uses> foo.c>, or in other words that
+C<foo.c> is a contributor to C<foo.o>. If we add the C<-recurse> flag:
 
 	% whouses -r foo.c
 	/vobs_sw/src/foo.c =>
 	  /vobs_sw/src/foo.o
 	    /vobs_sw/src/foo
 
-We see all files to which I<foo.c> contributes, indented according to
-how many generations removed they are. If we now add I<-terminals>
+We see all files to which C<foo.c> contributes, indented according to
+how many generations removed they are. If we now add C<-terminals>
 
 	% whouses -r -t foo.c
 	/vobs_sw/src/foo.c =>
 	  /vobs_sw/src/foo
 
-Intermediate targets such as I<foo.o> are suppressed so we see only the
-"final" targets descended from I<foo.c>.
+Intermediate targets such as C<foo.o> are suppressed so we see only the
+"final" targets descended from C<foo.c>.
 
-We can also go in the other direction using I<-backwards>:
+We can also go in the other direction using C<-backwards>:
 
 	% whouses -b -e foo
 	/vobs_sw/src/foo <=
 	  /vobs_sw/src/foo.o
 
-Which shows I<foo.o> as a progenitor of I<foo>. Note that the arrow
-(B<E<lt>=>) is turned around to indicate I<-backwards> mode. We also
-introduced the I<-exact> flag here. By default arguments to I<whouses>
-are treated as patterns, not file names, and since I<foo> has no
-extension it would have matched I<foo.c> and I<foo.o> as well. We can
+Which shows C<foo.o> as a progenitor of C<foo>. Note that the arrow
+(B<E<lt>=>) is turned around to indicate C<-backwards> mode. We also
+introduced the C<-exact> flag here. By default arguments to whouses
+are treated as patterns, not file names, and since C<foo> has no
+extension it would have matched C<foo.c> and C<foo.o> as well. We can
 combine recursion with backwards mode:
 
 	% whouses -b -e -r foo
@@ -227,28 +227,27 @@ combine recursion with backwards mode:
 	      /vobs_sw/src/foo.h
 	      /vobs_sw/src/bar.h
 
-And discover that I<foo.h> and I<bar.h> were also used.
+And discover that C<foo.h> and C<bar.h> were also used.
 
 When used recursively in the forward direction, this script answers the
 question "if I change file X, which derived files will need to be
 rebuilt"? This is the classic use, the one for which it was written.
 
-Because extracting a recursive CR can be quite slow, I<whouses>
+Because extracting a recursive CR can be quite slow, whouses
 provides ways of dumping the CR data to a file representation for
-speed. Use of I<-save>:
+speed. Use of C<-save>:
 
 	% whouses -cr foo -save ...
 
-will write out the data to I<foo.crdb>. Subsequently, if I<foo.crdb>
-exists and is newer than I<foo> data will be taken from it rather
-than re-generating the recursive I<catcr> report. See also the I<-db>
-and I<-fmt> flags.
+will write out the data to F<foo.crdb>. Subsequently, if F<foo.crdb>
+exists it will be used unless a new the C<-cr> flag is used.  See also
+the C<-db> and C<-fmt> flags.
 
-The default save format is that of I<Data::Dumper>. It was chosen
+The default save format is that of B<Data::Dumper>. It was chosen
 because it results in a nicely indented, human-readable text format
 file. Provision is made for subclassing to alternate storage formats,
-and subclasses for I<Storable> and I<Data::Denter> are provided as
-examples. Although the I<Storable> format may be somewhat faster than
+and subclasses for B<Storable> and B<Data::Denter> are provided as
+examples. Although the Storable format may be somewhat faster than
 the default, the real reason for the override capability is to allow an
 actual, fast database to be used.
 
@@ -261,9 +260,9 @@ CR's which refer back to all real deliverables.
 
 =head1 CLASSIC CODE ANALYSIS COMPARED
 
-I<Whouses> can best be described by comparison with "real" impact
-analysis products. There are a number of full-scale tools on the
-market.  Typically, these work by parsing the source code into some
+Whouses can best be described by comparison with "real" impact analysis
+products. There are a number of full-scale tools on the market.
+Typically, these work by parsing the source code into some
 representation which they can then analyze. It's a powerful technique
 but entails some tradeoffs:
 
