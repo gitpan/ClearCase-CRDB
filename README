@@ -16,15 +16,16 @@ SYNOPSIS
 
     Same as above but follows the chain of derived files recursively.
 
-      whouses -exact /vobs_xyz/include/foobar.h
+      whouses -exact foobar.h
 
-    Shows all DO's that make use of the specified file (must be given as a
-    an absolute pathname).
+    Shows all DO's that make use of the specified file. The "-exact" flag
+    suppresses pattern matching and shows only DO's which reference the
+    exact file.
 
 DESCRIPTION
     Whouses provides a limited form of "impact analysis" in a clearmake
     build environment. This is different from traditional impact analysis
-    (see CLASSIC CODE ANALYSIS COMPARED below for details) and in particular
+    (see TRUE CODE ANALYSIS COMPARED below for details) and in particular
     operates at the granularity of files rather than language elements.
 
     Whouses is best described by example. Imagine you have a VOB /vobs_sw in
@@ -35,7 +36,7 @@ DESCRIPTION
 
     Now, "foo" is a DO which has a config record ("CR") showing how it was
     made. Whouses analyzes that CR and prints the data in easy-to-read
-    indented format. For instance:
+    indented textual format. For instance:
 
             % whouses -cr foo foo.c
             /vobs_sw/src/foo.c  =>
@@ -71,8 +72,10 @@ DESCRIPTION
     is turned around to indicate "-backwards" mode. We also introduced the
     "-exact" flag here. By default arguments to whouses are treated as
     patterns, not file names, and since "foo" has no extension it would have
-    matched "foo.c" and "foo.o" as well. We can combine recursion with
-    backwards mode:
+    matched "foo.c" and "foo.o" as well. Use of "-exact" suppresses pattern
+    matching.
+
+    We can combine recursion with backwards mode:
 
             % whouses -b -e -r foo
             /vobs_sw/src/foo <=
@@ -87,9 +90,9 @@ DESCRIPTION
     question "if I change file X, which derived files will need to be
     rebuilt"? This is the classic use, the one for which it was written.
 
-    Because extracting a recursive CR can be quite slow, whouses provides
-    ways of dumping the CR data to a file representation for speed. Use of
-    "-save":
+    Because extracting a recursive CR can be quite slow for large build
+    systems, whouses provides ways of dumping the CR data to a file
+    representation for speed. Use of "-save":
 
             % whouses -cr foo -save ...
 
@@ -105,18 +108,41 @@ DESCRIPTION
     the real reason for the override capability is to allow an actual, fast
     database to be used.
 
-.AUDIT FILES
-    Derived objects matching the Perl RE /\.AUDIT/i are ignored. These are
-    presumed to be "meta-DO's" by convention, which aren't part of the build
-    per se but rather pseudo-targets whose only purpose is to hold CR's
-    which refer back to all real deliverables.
+SELECTING CONFIG RECORDS
+    If a "-cr" flag is given, the CRs are taken from the specified derived
+    object(s). Multiple DO's may be specified with multiple "-cr" flags or
+    as a comma-separated list. Alternatively, if the "CRDB_DO" environment
+    variable exists, its value is used as if specific with "-cr".
 
-CLASSIC CODE ANALYSIS COMPARED
+    If no DO's are specified directly, "whouses" will look for stored DO
+    data in files specified with "-db" or the "CRDB_DB" EV. The format is
+    the same as above.
+
+    Failing that, "whouses" will search for files named "*.crdb" along a
+    path specified with "-dir" or "CRDB_PATH", defaulting to the current
+    directory.
+
+.AUDIT FILES
+    As a special case, derived objects matching the Perl RE "/\.AUDIT/i" are
+    ignored while traversing the recursive config spec. These are presumed
+    to be "meta-DO's" by convention, which aren't part of the build per se
+    but rather pseudo-targets whose only purpose is to hold CR's which refer
+    back to all real deliverables. I.e. if you construct your Makefile to
+    create a meta-DO, you might want to name it ".AUDIT" or ".prog.AUDIT" or
+    something.
+
+ClearCase::CRDB
+    Most of the logic is actually in the "ClearCase::CRDB" module; the
+    "whouses" program is just a wrapper which uses the module. It's done
+    this way so ClearCase::CRDB can provide an API for other potential that
+    need to do CR analysis.
+
+TRUE CODE ANALYSIS COMPARED
     Whouses can best be described by comparison with "real" impact analysis
-    products. There are a number of full-scale tools on the market.
-    Typically, these work by parsing the source code into some
-    representation which they can then analyze. It's a powerful technique
-    but entails some tradeoffs:
+    products. There are a number of such tools on the market, for example
+    SNiFF+ from WindRiver. Typically these work by parsing the source code
+    into some database representation which they can then analyze. It's a
+    powerful technique but entails some tradeoffs:
 
    MINUSES
 
@@ -129,13 +155,14 @@ CLASSIC CODE ANALYSIS COMPARED
         expensive.
 
     *   Another corollary is that the tool must track each advance in each
-        language, usually with significant lag time.
+        language, usually with significant lag time, and may not be
+        bug-for-bug compatible with the compiler.
 
     *   Also, since analysis basically entails compiling the code, analysis
         of a large code base can take a long time, potentially as long or
         longer than actually building it.
 
-    *   If some part of your application is written in a language the tool
+    *   If some part of the application is written in a language the tool
         doesn't know (say Python or Visual Basic or Perl or an IDL), no
         analysis of that area can take place.
 
@@ -158,6 +185,10 @@ CLASSIC CODE ANALYSIS COMPARED
     flips this around; it doesn't care about language but it only works with
     build systems that use clearmake, which is part of ClearCase.
 
+    Whouses takes the config records (aka CR's) generated by clearmake,
+    analyzes them, and tells you which files depend on which other files
+    according to the CRs.
+
 AUTHOR
     David Boyce <dsb@boyski.com>
 
@@ -173,7 +204,7 @@ STATUS
     leave the interface alone.
 
 PORTING
-    I've tried to write this in a platform independent style but it has not
+    I've tried to write this in a platform independent style but it hasn't
     been heavily tested on Windows (actually it hasn't been all that heavily
     tested anywhere). It does pass "make test" on Windows and appears to
     work fine in limited testing.

@@ -1,6 +1,6 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 require 5.6.0;
 
@@ -294,6 +294,8 @@ ClearCase::CRDB - base class for ClearCase config-record analysis
 =head1 SYNOPSIS
 
     my $crdb = ClearCase::CRDB->new(@ARGV);	# @ARGV is a list of DO's
+    $crdb->check;				# Do a CR sanity check
+    $crdb->catcr;				# Analyze the recursive CR
 
 =head1 DESCRIPTION
 
@@ -339,6 +341,9 @@ given usage may be assumed to look like:
 
     $obj->method;
 
+Also, if the return value is described in plural terms it may be
+assumed this means a list.
+
 =over 4
 
 =item * crdo
@@ -372,6 +377,23 @@ Writes the processed config record data to the specified file.
 =item * load
 
 Reads processed config record data from the specified files.
+
+=item * needs_do
+
+Takes a list of derived objects, returns the list of derived objects
+which they use. For example, if C<foo.c> includes C<foo.h> and compiles
+to C<foo.o> which then links to the executable C<foo>, the
+C<-E<gt>needs_do> method when given C<foo.o> would return the list
+C<('foo.c', 'foo.h')>. In other words it returns "upstream
+dependencies".
+
+=item * makes_do
+
+Takes a list of derived objects, returns the list of derived objects
+which use them. This is the reverse of C<needs_do>. Given the
+C<needs_do> example above, the C<-E<gt>makes_do> method when given
+C<foo.o> would return C<foo>. In other words it returns "downstream
+dependencies".
 
 =item * iwd
 
@@ -421,6 +443,9 @@ Returns the build script for the specified DO:
     my $script = $obj->script("path-to-derived-object");
 
 =back
+
+There are also some undocumented methods in the source. This is
+deliberate; they're experimental.
 
 =head1 AUTHOR
 
