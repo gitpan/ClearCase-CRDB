@@ -5,7 +5,7 @@ MOTTO
     You give me a clean CR, I'll give you a clean impact analysis.
 
 SYNOPSIS
-    Run this script with the "-help" option for usage details. Here are some
+    Run this script with the `-help' option for usage details. Here are some
     additional sample usages with explanations:
 
       whouses foobar.h
@@ -18,7 +18,7 @@ SYNOPSIS
 
       whouses -exact foobar.h
 
-    Shows all DO's that make use of the specified file. The "-exact" flag
+    Shows all DO's that make use of the specified file. The `-exact' flag
     suppresses pattern matching and shows only DO's which reference the
     exact file.
 
@@ -29,12 +29,12 @@ DESCRIPTION
     operates at the granularity of files rather than language elements.
 
     Whouses is best described by example. Imagine you have a VOB /vobs_sw in
-    which you build the incredibly simple application "foo" from "foo.c".
-    You have a Makefile which compiles "foo.c" to "foo.o" and then links it
-    to produce "foo". And let's further assume you've just done a build
+    which you build the incredibly simple application `foo' from `foo.c'.
+    You have a Makefile which compiles `foo.c' to `foo.o' and then links it
+    to produce `foo'. And let's further assume you've just done a build
     using clearmake.
 
-    Thus, "foo" is a DO which has a config record ("CR") showing how it was
+    Thus, `foo' is a DO which has a config record (*CR*) showing how it was
     made. Whouses analyzes that CR and prints the data in easy-to-read
     indented textual format. For instance:
 
@@ -42,65 +42,65 @@ DESCRIPTION
             /vobs_sw/src/foo.c  =>
               /vobs_sw/src/foo.o
 
-    The "-do foo" points to the derived object from which to extract and
+    The `-do foo' points to the derived object from which to extract and
     analyze the CR; it will be implicit in the remaining examples. The
-    output indicates that "foo.o uses foo.c", or in other words that "foo.c"
-    is a contributor to "foo.o". If we add the "-recurse" flag:
+    output indicates that `foo.o uses foo.c', or in other words that `foo.c'
+    is a contributor to `foo.o'. If we add the `-recurse' flag:
 
             % whouses -r foo.c
             /vobs_sw/src/foo.c =>
               /vobs_sw/src/foo.o
                 /vobs_sw/src/foo
 
-    We see all files to which "foo.c" contributes, indented according to how
-    many generations removed they are. If we now add "-terminals"
+    We see all files to which `foo.c' contributes, indented according to how
+    many generations removed they are. If we now add `-terminals'
 
             % whouses -r -t foo.c
             /vobs_sw/src/foo.c =>
               /vobs_sw/src/foo
 
-    Intermediate targets such as "foo.o" are suppressed so we see only the
-    "final" targets descended from "foo.c".
+    Intermediate targets such as `foo.o' are suppressed so we see only the
+    "final" targets descended from `foo.c'.
 
-    We can also go in the other direction using "-backwards":
+    We can also go in the other direction using `-backwards':
 
             % whouses -b -e foo
             /vobs_sw/src/foo <=
               /vobs_sw/src/foo.o
 
-    Which shows "foo.o" as a progenitor of "foo". Note that the arrow (<=)
-    is turned around to indicate "-backwards" mode. We also introduced the
-    "-exact" flag here. By default arguments to whouses are treated as
-    patterns, not file names, and since "foo" has no extension it would have
-    matched "foo.c" and "foo.o" as well. Use of "-exact" suppresses pattern
+    Which shows `foo.o' as a progenitor of `foo'. Note that the arrow (<=)
+    is turned around to indicate `-backwards' mode. We also introduced the
+    `-exact' flag here. By default arguments to whouses are treated as
+    patterns, not file names, and since `foo' has no extension it would have
+    matched `foo.c' and `foo.o' as well. Use of `-exact' suppresses pattern
     matching.
 
     We can combine recursion with backwards mode:
 
-            % whouses -b -e -r foo
+            % whouses -back -exact -recurse foo
             /vobs_sw/src/foo <=
               /vobs_sw/src/foo.o
                   /vobs_sw/src/foo.c
                   /vobs_sw/src/foo.h
                   /vobs_sw/src/bar.h
 
-    And discover that "foo.h" and "bar.h" were also used.
+    And discover that `foo.h' and `bar.h' were also used.
 
     When used recursively in the forward direction, this script answers the
     question "if I change file X, which derived files will need to be
     rebuilt"? This is the classic use, the one for which it was written.
     When used recursively in the backward direction it can depict the entire
-    dependency tree in a readable format.
+    dependency tree in an easily readable format.
 
     Because extracting a recursive CR can be quite slow for large build
     systems, whouses provides ways of dumping the CR data to a file
-    representation for speed. Use of "-save":
+    representation for speed. Use of `-save':
 
             % whouses -do foo -save ...
 
     will write out the data to foo.crdb. Subsequently, if foo.crdb exists it
-    will be used unless a new the "-do" flag is used. See also the "-db" and
-    "-fmt" flags.
+    will be used unless a new the `-do' flag is used. See also the `-db' and
+    `-fmt' flags.
 
     The default save format is that of Data::Dumper. It was chosen because
     it results in a nicely indented, human-readable text format file.
@@ -111,31 +111,31 @@ DESCRIPTION
     database to be used.
 
 SELECTING CONFIG RECORDS
-    If a "-do" flag is given, the CRs are taken from the specified derived
-    object(s). Multiple DO's may be specified with multiple "-do" flags or
-    as a comma-separated list. Alternatively, if the "CRDB_DO" environment
-    variable exists, its value is used as if specific with "-do".
+    If a `-do' flag is given, the CRs are taken from the specified derived
+    object(s). Multiple DO's may be specified with multiple `-do' flags or
+    as a comma-separated list. Alternatively, if the `CRDB_DO' environment
+    variable exists, its value is used as if specific with `-do'.
 
-    If no DO's are specified directly, "whouses" will look for stored DO
-    data in files specified with "-db" or the "CRDB_DB" EV. The format is
+    If no DO's are specified directly, `whouses' will look for stored DO
+    data in files specified with `-db' or the `CRDB_DB' EV. The format is
     the same as above.
 
-    Failing that, "whouses" will search for files named "*.crdb" along a
-    path specified with "-dir" or "CRDB_PATH", defaulting to the current
+    Failing that, `whouses' will search for files named `*.crdb' along a
+    path specified with `-dir' or `CRDB_PATH', defaulting to the current
     directory.
 
 .AUDIT FILES
-    As a special case, derived objects matching the Perl RE "/\.AUDIT/i" are
+    As a special case, derived objects matching the Perl RE `/\.AUDIT/i' are
     ignored while traversing the recursive config spec. These are presumed
-    to be "meta-DO's" by convention, which aren't part of the build per se
+    to be *meta-DO's* by convention, which aren't part of the build per se
     but rather pseudo-targets whose only purpose is to hold CR's which refer
     back to all real deliverables. I.e. if you construct your Makefile to
-    create a meta-DO, you might want to name it ".AUDIT" or ".prog.AUDIT" or
+    create a meta-DO, you might want to name it `.AUDIT' or `.prog.AUDIT' or
     something.
 
 ClearCase::CRDB
-    Most of the logic is actually in the "ClearCase::CRDB" module; the
-    "whouses" program is just a wrapper which uses the module. It's done
+    Most of the logic is actually in the `ClearCase::CRDB' module; the
+    `whouses' program is just a wrapper which uses the module. It's done
     this way so ClearCase::CRDB can provide an API for other potential that
     need to do CR analysis.
 
@@ -146,7 +146,7 @@ TRUE CODE ANALYSIS COMPARED
     into some database representation which they can then analyze. It's a
     powerful technique but entails some tradeoffs:
 
-   MINUSES
+  MINUSES
 
     *   A true code analysis tool must have knowledge of each programming
         language in use. I.e. to add support for Java, a Java parser must be
@@ -168,7 +168,7 @@ TRUE CODE ANALYSIS COMPARED
         doesn't know (say Python or Visual Basic or Perl or an IDL), no
         analysis of that area can take place.
 
-   PLUSES
+  PLUSES
 
     *   The analysis can be as granular and as language-knowledgeable as its
         developers can make it. If you change the signature of a C function,
@@ -208,7 +208,7 @@ STATUS
 PORTING
     I've tried to write this in a platform independent style but it hasn't
     been heavily tested on Windows (actually it hasn't been all that heavily
-    tested anywhere). It does pass "make test" on Windows and appears to
+    tested anywhere). It does pass `make test' on Windows and appears to
     work fine in limited testing.
 
 SEE ALSO

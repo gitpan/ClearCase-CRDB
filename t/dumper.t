@@ -29,6 +29,7 @@ be able to work around this by modifying your PATH appropriately.
     exit 0;
 }
 
+#open(ERR, '>&STDERR');
 open(STDERR, ">&STDOUT");
 chdir('./t') || chdir('../t') || die "./t: $!";
 
@@ -53,5 +54,7 @@ $final += printok(-e "$tgt.crdb");
 # Test analysis from cached CR DB ...
 $final += printok(!system("$^X ../whouses -db $tgt -fmt Dumper -r -b $tgt"));
 exit $final if $final;
+
+#print ERR "A sample of the CRDB format has been left in t/prog1.crdb ...\n";
 
 exit $final;

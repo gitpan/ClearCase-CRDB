@@ -11,3 +11,13 @@ Revision history for Perl extension ClearCase::CRDB.
 
 0.04 Tue Oct 16 11:09:28 EDT 2001
 	- More doc work.
+
+0.05 Wed Oct 17 13:52:21 EDT 2001
+
+0.06 Thu Oct 18 13:53:57 EDT 2001
+	- Slight reworking of object layout; allow for multiple
+	  iwd's in case of recursive builds.
+	- Added recursive-make sample makefile and recmake.t test.
+
+0.07 Sat Oct 27 21:37:12 EDT 2001
+	- Added 'schema' number to deal with potential future reorgs.

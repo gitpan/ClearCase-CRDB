@@ -182,7 +182,7 @@ from C<foo.c>.  You have a Makefile which compiles C<foo.c> to C<foo.o>
 and then links it to produce C<foo>. And let's further assume you've
 just done a build using clearmake.
 
-Thus, C<foo> is a DO which has a config record ("CR") showing how it
+Thus, C<foo> is a DO which has a config record (I<CR>) showing how it
 was made. Whouses analyzes that CR and prints the data in easy-to-read
 indented textual format.  For instance:
 
@@ -190,7 +190,7 @@ indented textual format.  For instance:
 	/vobs_sw/src/foo.c  =>
 	  /vobs_sw/src/foo.o
 
-The "-do foo" points to the derived object from which to extract and
+The C<-do foo> points to the derived object from which to extract and
 analyze the CR; it will be implicit in the remaining examples.  The
 output indicates that C<foo.o B<uses> foo.c>, or in other words that
 C<foo.c> is a contributor to C<foo.o>. If we add the C<-recurse> flag:
@@ -225,7 +225,7 @@ of C<-exact> suppresses pattern matching.
 
 We can combine recursion with backwards mode:
 
-	% whouses -b -e -r foo
+	% whouses -back -exact -recurse foo
 	/vobs_sw/src/foo <=
 	  /vobs_sw/src/foo.o
 	      /vobs_sw/src/foo.c
@@ -238,7 +238,7 @@ When used recursively in the forward direction, this script answers the
 question "if I change file X, which derived files will need to be
 rebuilt"? This is the classic use, the one for which it was written.
 When used recursively in the backward direction it can depict the
-entire dependency tree in a readable format.
+entire dependency tree in an easily readable format.
 
 Because extracting a recursive CR can be quite slow for large build
 systems, whouses provides ways of dumping the CR data to a file
@@ -278,7 +278,7 @@ directory.
 
 As a special case, derived objects matching the Perl RE C</\.AUDIT/i>
 are ignored while traversing the recursive config spec. These are
-presumed to be "meta-DO's" by convention, which aren't part of the
+presumed to be I<meta-DO's> by convention, which aren't part of the
 build per se but rather pseudo-targets whose only purpose is to hold
 CR's which refer back to all real deliverables. I.e. if you construct
 your Makefile to create a meta-DO, you might want to name it C<.AUDIT>
@@ -299,7 +299,7 @@ SNiFF+ from WindRiver.  Typically these work by parsing the source code
 into some database representation which they can then analyze. It's a
 powerful technique but entails some tradeoffs:
 
-=head3 MINUSES
+=head2 MINUSES
 
 =over 4
 
@@ -335,7 +335,7 @@ analysis of that area can take place.
 
 =back
 
-=head3 PLUSES
+=head2 PLUSES
 
 =over 4
 
@@ -388,7 +388,7 @@ to leave the interface alone.
 
 I've tried to write this in a platform independent style but it hasn't
 been heavily tested on Windows (actually it hasn't been all that
-heavily tested anywhere). It does pass "make test" on Windows and
+heavily tested anywhere). It does pass C<make test> on Windows and
 appears to work fine in limited testing.
 
 =head1 SEE ALSO

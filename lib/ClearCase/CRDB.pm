@@ -1,6 +1,10 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.05';
+$VERSION = '0.07';
+
+# This is stored in the flat-file form via ->store and compared during
+# ->load. A warning is issued if they don't match.
+my $mod_schema = 1;
 
 require 5.6.0;
 
@@ -149,6 +153,7 @@ sub hash_merge {
 sub store {
     my $self = shift;
     my $file = shift;
+    $self->{CRDB_SCHEMA} = $mod_schema;
     my $d = Data::Dumper->new([$self], ['_DO']);
     $d->Indent(1);
     open(DUMP, ">$file") || die "$file: $!\n";
@@ -171,6 +176,10 @@ sub load {
 	    warn "Error: $db: " . (-r $db ? $@ : $!);
 	    return undef;
 	}
+	$DB::single = 1;
+	my $file_schema = $hashref->{CRDB_SCHEMA};
+	die "Error: $db: stored schema ($file_schema) != current ($mod_schema)"
+					unless $file_schema == $mod_schema;
 	$self->hash_merge($hashref, @{$hashref->{CRDB_CRDO}});
     }
     return $self;

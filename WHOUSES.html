@@ -21,12 +21,8 @@
 	<LI><A HREF="#true code analysis compared">TRUE CODE ANALYSIS COMPARED</A></LI>
 	<UL>
 
-		<UL>
-
-			<LI><A HREF="#minuses">MINUSES</A></LI>
-			<LI><A HREF="#pluses">PLUSES</A></LI>
-		</UL>
-
+		<LI><A HREF="#minuses">MINUSES</A></LI>
+		<LI><A HREF="#pluses">PLUSES</A></LI>
 	</UL>
 
 	<LI><A HREF="#author">AUTHOR</A></LI>
@@ -73,14 +69,14 @@ it operates at the granularity of files rather than language elements.</P>
 from <CODE>foo.c</CODE>.  You have a Makefile which compiles <CODE>foo.c</CODE> to <CODE>foo.o</CODE>
 and then links it to produce <CODE>foo</CODE>. And let's further assume you've
 just done a build using clearmake.</P>
-<P>Thus, <CODE>foo</CODE> is a DO which has a config record (``CR'') showing how it
+<P>Thus, <CODE>foo</CODE> is a DO which has a config record (<EM>CR</EM>) showing how it
 was made. Whouses analyzes that CR and prints the data in easy-to-read
 indented textual format.  For instance:</P>
 <PRE>
         % whouses -do foo foo.c
         /vobs_sw/src/foo.c  =&gt;
           /vobs_sw/src/foo.o</PRE>
-<P>The ``-do foo'' points to the derived object from which to extract and
+<P>The <CODE>-do foo</CODE> points to the derived object from which to extract and
 analyze the CR; it will be implicit in the remaining examples.  The
 output indicates that <CODE>foo.o uses foo.c</CODE>, or in other words that
 <CODE>foo.c</CODE> is a contributor to <CODE>foo.o</CODE>. If we add the <CODE>-recurse</CODE> flag:</P>
@@ -110,7 +106,7 @@ extension it would have matched <CODE>foo.c</CODE> and <CODE>foo.o</CODE> as wel
 of <CODE>-exact</CODE> suppresses pattern matching.</P>
 <P>We can combine recursion with backwards mode:</P>
 <PRE>
-        % whouses -b -e -r foo
+        % whouses -back -exact -recurse foo
         /vobs_sw/src/foo &lt;=
           /vobs_sw/src/foo.o
               /vobs_sw/src/foo.c
@@ -121,7 +117,7 @@ of <CODE>-exact</CODE> suppresses pattern matching.</P>
 question ``if I change file X, which derived files will need to be
 rebuilt''? This is the classic use, the one for which it was written.
 When used recursively in the backward direction it can depict the
-entire dependency tree in a readable format.</P>
+entire dependency tree in an easily readable format.</P>
 <P>Because extracting a recursive CR can be quite slow for large build
 systems, whouses provides ways of dumping the CR data to a file
 representation for speed. Use of <CODE>-save</CODE>:</P>
@@ -156,7 +152,7 @@ directory.</P>
 <H1><A NAME=".audit files">.AUDIT FILES</A></H1>
 <P>As a special case, derived objects matching the Perl RE <CODE>/\.AUDIT/i</CODE>
 are ignored while traversing the recursive config spec. These are
-presumed to be ``meta-DO's'' by convention, which aren't part of the
+presumed to be <EM>meta-DO's</EM> by convention, which aren't part of the
 build per se but rather pseudo-targets whose only purpose is to hold
 CR's which refer back to all real deliverables. I.e. if you construct
 your Makefile to create a meta-DO, you might want to name it <CODE>.AUDIT</CODE>
@@ -177,7 +173,7 @@ SNiFF+ from WindRiver.  Typically these work by parsing the source code
 into some database representation which they can then analyze. It's a
 powerful technique but entails some tradeoffs:</P>
 <P>
-<H3><A NAME="minuses">MINUSES</A></H3>
+<H2><A NAME="minuses">MINUSES</A></H2>
 <UL>
 <LI>
 A true code analysis tool must have knowledge of each programming
@@ -205,7 +201,7 @@ doesn't know (say Python or Visual Basic or Perl or an IDL), no
 analysis of that area can take place.
 <P></P></UL>
 <P>
-<H3><A NAME="pluses">PLUSES</A></H3>
+<H2><A NAME="pluses">PLUSES</A></H2>
 <UL>
 <LI>
 The analysis can be as granular and as language-knowledgeable as its
@@ -250,7 +246,7 @@ to leave the interface alone.</P>
 <H1><A NAME="porting">PORTING</A></H1>
 <P>I've tried to write this in a platform independent style but it hasn't
 been heavily tested on Windows (actually it hasn't been all that
-heavily tested anywhere). It does pass ``make test'' on Windows and
+heavily tested anywhere). It does pass <CODE>make test</CODE> on Windows and
 appears to work fine in limited testing.</P>
 <P>
 <HR>
