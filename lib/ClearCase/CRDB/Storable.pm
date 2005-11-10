@@ -51,7 +51,7 @@ storage format is binary and thus not (easily) human readable.
 
 =head1 AUTHOR
 
-David Boyce <dsbperl@cleartool.com>
+David Boyce <dsbperl AT boyski.com>
 
 =head1 COPYRIGHT
 

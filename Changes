@@ -30,3 +30,7 @@ Revision history for Perl extension ClearCase::CRDB.
 
 0.10 Tue Jul 22 10:48:02 EDT 2003
 	- Fixed contact data.
+
+0.11 Thu Nov 10 07:59:11 EST 2005
+	- Dealt with a slight change in CR format introduced in CC 6.0.
+	  This simply suppresses a warning issued with the new format.

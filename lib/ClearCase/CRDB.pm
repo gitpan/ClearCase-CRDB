@@ -1,6 +1,6 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 # This schema version is stored in the flat-file form via ->store
 # and compared during ->load. A warning is issued if they don't match.
@@ -64,7 +64,10 @@ sub catcr {
 	next if /^-{28}/;
 
 	# State machine - set $state according to the CR section.
-        if (m%^Target\s+(\S*)\s+built\s%) {
+        if (m%^Derived object:%) {
+	    $state = $Notes;
+	    next;
+        } elsif (m%^Target\s+(\S*)\s+built\s%) {
 	    $tgt = $1;
 	    $state = $Notes;
 	    next;
@@ -476,7 +479,7 @@ deliberate; they're experimental.
 
 =head1 AUTHOR
 
-David Boyce <dsbperl@cleartool.com>
+David Boyce <dsbperl AT boyski.com>
 
 =head1 COPYRIGHT
 

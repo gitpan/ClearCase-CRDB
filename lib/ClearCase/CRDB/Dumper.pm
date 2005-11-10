@@ -28,7 +28,7 @@ provided too. It has the same semantics as its base class.
 
 =head1 AUTHOR
 
-David Boyce <dsbperl@cleartool.com>
+David Boyce <dsbperl AT boyski.com>
 
 =head1 COPYRIGHT
 
