@@ -109,7 +109,7 @@ my $ln = '';
     my $type = $opt{macro} ? 'var' : 'do';
     my $query = "${direction}_$type";
     if ($opt{exact}) {
-	@matches = map {File::Spec::Unix->rel2abs($_, $cr->iwd)} @ARGV;
+	@matches = map {File::Spec->rel2abs($_, $cr->iwd)} @ARGV;
     } else {
        my $match_method = "matches_$type";
        @matches = $cr->$match_method(@ARGV);

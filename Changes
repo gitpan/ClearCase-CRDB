@@ -34,3 +34,9 @@ Revision history for Perl extension ClearCase::CRDB.
 0.11 Thu Nov 10 07:59:11 EST 2005
 	- Dealt with a slight change in CR format introduced in CC 6.0.
 	  This simply suppresses a warning issued with the new format.
+
+0.12 Mon Nov 21 16:53:48 EST 2005
+	- Fixed a number of Windows-specific bugs involving paths
+	  (/-vs-\, case sensitivity, and drive letters).
+	- Fix: do not assume a variables section between MVFS Objects
+	  and Build Script.

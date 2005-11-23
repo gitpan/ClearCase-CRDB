@@ -1,6 +1,6 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 # This schema version is stored in the flat-file form via ->store
 # and compared during ->load. A warning is issued if they don't match.
@@ -41,7 +41,12 @@ sub new {
 
 sub crdo {
     my $self = shift;
-    push(@{$self->{CRDB_CRDO}}, map {File::Spec::Unix->rel2abs($_)} @_) if @_;
+    if (@_) {
+	push(@{$self->{CRDB_CRDO}}, map {File::Spec->rel2abs($_)} @_);
+	if (MSWIN) {
+	    s%^[a-z]:%%i for (@{$self->{CRDB_CRDO}});
+	}
+    }
     return @{$self->{CRDB_CRDO}};
 }
 
@@ -69,6 +74,7 @@ sub catcr {
 	    next;
         } elsif (m%^Target\s+(\S*)\s+built\s%) {
 	    $tgt = $1;
+	    $tgt =~ s%^[a-z]:%%i if MSWIN;
 	    $state = $Notes;
 	    next;
 	} elsif (($state == $Notes || $state == $Objects) && m%MVFS objects:%) {
@@ -79,7 +85,7 @@ sub catcr {
 	} elsif ($state == $Objects && m%^Variables and Options:%) {
 	    $state = $Vars;
 	    next;
-	} elsif ($state == $Vars && m%^Build Script:%) {
+	} elsif (($state == $Vars || $state == $Objects) && m%^Build Script:%) {
 	    $state = $Script;
 	    next;
 	}
@@ -88,7 +94,8 @@ sub catcr {
 	if ($state == $Notes) {
 	    push(@notes, $_);
 	    if (my($base) = m%^Initial working directory was (\S+)%) {
-		my $full = File::Spec::Unix->rel2abs($tgt, $base);
+		my $full = File::Spec->rel2abs($tgt, $base);
+		$full =~ s%^[a-z]:%%i if MSWIN;
 		$self->iwd($full, $base);
 		if (-e $full) {
 		    $tgt = $full;
@@ -99,23 +106,28 @@ sub catcr {
 	} elsif ($state == $Objects) {
 	    my($path, $vers, $date);
 	    if (($path, $vers, $date) = m%^([/\\].+)@@(\S+)\s+<(\S+)>$%) {
-		for ($path, $vers) { s%\\%/%g };
+		$path =~ s%^[a-z]:%%i if MSWIN;
 		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'ELEM';
 		$self->{CRDB_FILES}->{$path}->{CR_ELEM}->{CR_VERS} = $vers;
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
 	    } elsif (($path, $date) = m%^([/\\].+)@@(\S+)$%) {
-		$path =~ s%\\%/%g;
+		$path =~ s%^[a-z]:%%i if MSWIN;
 		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'DO';
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
 	    } elsif (($path, $date) = m%^([/\\].+\S)\s+<(\S+)>$%) {
-		$path =~ s%\\%/%g;
+		$path =~ s%^[a-z]:%%i if MSWIN;
 		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'NON';
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
 	    } else {
 		warn "Warning: unrecognized CR line: '$_'";
 		next;
 	    }
-	    next if $path eq $tgt;
+	    if (MSWIN) {
+		# Must compare paths case-insensitively on Windows.
+		next if lc($path) eq lc($tgt);
+	    } else {
+		next if $path eq $tgt;
+	    }
 	    $self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_NEEDS}->{$path} = 1;
 	    next if exists $self->{CRDB_FILES}->{$tgt}->{CR_PHONY};
 	    $self->{CRDB_FILES}->{$path}->{CR_MAKES}->{$tgt} = 1;
@@ -181,7 +193,6 @@ sub load {
 	    warn "Error: $db: " . (-r $db ? $@ : $!);
 	    return undef;
 	}
-	$DB::single = 1;
 	my $file_schema = $hashref->{CRDB_SCHEMA};
 	die "Error: $db: stored schema ($file_schema) != current ($mod_schema)"
 					unless $file_schema == $mod_schema;
@@ -479,11 +490,11 @@ deliberate; they're experimental.
 
 =head1 AUTHOR
 
-David Boyce <dsbperl AT boyski.com>
+David Boyce <dsbperl AT cleartool.com>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000-2002 David Boyce. All rights reserved.  This Perl
+Copyright (c) 2000-2005 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute and/or modify it under
 the same terms as Perl itself.
 
@@ -501,7 +512,8 @@ lifecycle, on almost all CC platforms including Solaris 2.6-8, HP-UX 10
 and 11, and Windows NT4 and Win2K SP2 using perl 5.004_04 through 5.6.1
 and CC4.1 through 5.0.  However, I tend to use the latest of everything
 (CC5.0, Solaris8, Win2KSP2, Perl5.6.1 at this writing) and cannot
-regression-test with anything earlier.
+regression-test with anything earlier. Also, note that I rarely use
+this on Windows so it may be buggier there.
 
 =head1 BUGS
 
@@ -509,7 +521,7 @@ NOTE: A bug in CC 5.0 causes CRDB's "make test" to dump core. This bug
 is in clearmake, not CRDB, and in any case affects only its test
 suite.  The first CC 5.0 patch contains a fix, so you probably don't
 want to use CC 5.0 unpatched. If you do, ignore the core dump in
-the test suite and force and install anyway.
+the test suite and force the install anyway.
 
 Please send bug reports or patches to the address above.
 
