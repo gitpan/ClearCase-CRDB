@@ -1,27 +1,38 @@
 package ClearCase::CRDB;
 
-$VERSION = '0.12';
+$VERSION = '0.15';
 
 # This schema version is stored in the flat-file form via ->store
 # and compared during ->load. A warning is issued if they don't match.
 my $mod_schema = 1;
 
 # I don't know exactly what Perl version is the minimum required but I
-# have a report that it works with 5.005. I use 5.6.1 myself.
+# have a report that it works with 5.005. I use 5.8 myself.
 require 5.005;
 
+use File::Basename;
 use File::Spec 0.82;
+use Getopt::Long;
+use Cwd;
 
 # For convenience, load up known subclasses. We 'eval' these to ignore
 # the error msg if the underlying serialization modules
 # Data::Dumper/Storable/etc aren't installed.
 eval { require ClearCase::CRDB::Dumper; };
-eval { require ClearCase::CRDB::Denter; };
 eval { require ClearCase::CRDB::Storable; };
 
 use strict;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+
+my $prog = basename($0, qw(.pl));
+
+# Defining multiple constants at once isn't supported before 5.8.
+use constant SKIP => 0;
+use constant NOTES => 1;
+use constant OBJECTS => 2;
+use constant VARS => 3;
+use constant SCRIPT => 4;
 
 sub new {
     my $proto = shift;
@@ -35,8 +46,84 @@ sub new {
     $class = $proto;
     $self = {};
     bless $self, $class;
-    $self->catcr(@_) if @_;
+    # HACK - this doesn't actually use @_, it's just an indication
+    # that we want to parse @ARGV.
+    $self->init if @_;
     return $self;
+}
+
+sub usage {
+    my $self = shift;
+    return "TBD";
+}
+
+sub init {
+    my $self = shift;
+    my %opt;
+    my $ext = 'crdb';
+    my $delim = MSWIN ? ',;' : ',;:';
+
+    # Any options matched here are removed from the global @ARGV.
+    local $Getopt::Long::passthrough = 1;
+    GetOptions(\%opt, qw(cr|cache=s do=s@ db=s@ lsprivate recurse save));
+
+    if ($opt{do} || $opt{lsprivate} || $ENV{CRDB_DO}) {
+	my @dos;
+	if ($opt{do}) {
+	    @dos = @{$opt{do}};
+	    if (@dos == 1 && $dos[0] eq '-') {
+		chomp(@dos = <STDIN>);
+	    }
+	} elsif ($opt{lsprivate}) {
+	    @dos = qx(cleartool lsprivate -do);
+	    chomp @dos;
+	} elsif ($ENV{CRDB_DO}) {
+	    @dos = map {split /[$delim]/} $ENV{CRDB_DO};
+	}
+	$self->crdo(@dos);
+	if ($opt{recurse}) {
+	    $self->catcr_recurse;
+	} else {
+	    $self->catcr_flat;
+	}
+
+	my $savefile;
+	if ($opt{db}) {
+	    die "$prog: Error: can write to only one database file"
+							    if @{$opt{db}} != 1;
+	    $savefile = $opt{db}->[0];
+	} elsif ($opt{save}) {
+	    $savefile = $dos[0];
+	}
+	if ($savefile) {
+	    $savefile .= ".$ext" unless $savefile =~ m%$ext$%;
+	    $self->store($savefile);
+	}
+    } elsif ($opt{cr}) {
+	open(CR, $opt{cr}) || die "$prog: Error: $opt{cr}: $!";
+	$self->catcr_handle(\*CR);
+	close(CR);
+	if ($opt{save}) {
+	    (my $savefile = $opt{cr}) =~ s%\.\w+?$%.$ext%;
+	    $self->store($savefile);
+	}
+    } elsif ($opt{db} || $ENV{CRDB_DB}) {
+	my $dblist = $opt{db} ? join(',', @{$opt{db}}) : $ENV{CRDB_DB};
+	my @dbs = map {split /[$delim]/} $dblist;
+	for (@dbs) {
+	    $_ .= ".$ext" unless m%$ext$%;
+	}
+	$self->load(@dbs);
+    } else {
+	my $path = $opt{dir} || $ENV{CRDB_PATH} || '.';
+	my @found;
+	for my $dir (split /[$delim]/, $path) {
+	    push(@found, glob("$dir/.*.$ext"), glob("$dir/*.$ext"));
+	}
+	die "$prog: Error: no CRDB databases found" unless @found;
+	my $s = @found > 1 ? 's' : '';
+	$self->load(@found);
+    }
 }
 
 sub crdo {
@@ -58,66 +145,117 @@ sub check {
     return system(qw(cleartool catcr -check -union), @objects);
 }
 
-sub catcr {
+# Useful in development; allows a pre-generated catcr output to be
+# stashed in a file and passed in here repeatedly.
+sub catcr_handle {
     my $self = shift;
-    $self->crdo(@_) if @_;
-    my($tgt, $state, @notes);
-    my($Notes, $Objects, $Vars, $Script) = 1..4;
-    open (CR, "cleartool catcr -r @{[$self->crdo]} |") || exit 2;
-    for (<CR>) {
+    my $handle = shift;
+    my($tgt, @notes);
+    my $state = SKIP;
+    for (<$handle>) {
 	chomp;
-	next if /^-{28}/;
 
 	# State machine - set $state according to the CR section.
-        if (m%^Derived object:%) {
-	    $state = $Notes;
+	if (m%^-{28}%) {
 	    next;
-        } elsif (m%^Target\s+(\S*)\s+built\s%) {
+        } elsif (m%^Derived object:\s+(.*)@@%) {
 	    $tgt = $1;
 	    $tgt =~ s%^[a-z]:%%i if MSWIN;
-	    $state = $Notes;
+	    if (exists $self->{CRDB_FILES}->{$tgt} &&
+		    (exists $self->{CRDB_FILES}->{$tgt}->{CR_DO} ||
+		    exists $self->{CRDB_FILES}->{$tgt}->{CR_SIBLING_OF})) {
+		$state = SKIP;
+	    } elsif (!MSWIN && basename($tgt) eq 'core') {
+		# This is a hack, but some builds produce lots of core
+		# files and we generally want to ignore the spurious
+		# DOs thus produced.
+		$state = SKIP;
+	    } else {
+		$state = NOTES;
+	    }
 	    next;
-	} elsif (($state == $Notes || $state == $Objects) && m%MVFS objects:%) {
+        } elsif (m%^Target\s+(\S*)\s+built\s%) {
+	    $state = SKIP if $1 eq 'ClearAudit_Shell';
+	    next;
+	} elsif ($state == SKIP) {
+	    next;
+	} elsif (($state == NOTES || $state == OBJECTS) && m%MVFS objects:%) {
 	    @{$self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_NOTES}} = @notes;
 	    @notes = ();
-	    $state = $Objects;
+	    $state = OBJECTS;
 	    next;
-	} elsif ($state == $Objects && m%^Variables and Options:%) {
-	    $state = $Vars;
+	} elsif ($state == OBJECTS && m%^Variables and Options:%) {
+	    $state = VARS;
 	    next;
-	} elsif (($state == $Vars || $state == $Objects) && m%^Build Script:%) {
-	    $state = $Script;
+	} elsif (($state == VARS || $state == OBJECTS) && m%^Build Script:%) {
+	    $state = SCRIPT;
 	    next;
 	}
 
 	# Accumulate data from section according to $state.
-	if ($state == $Notes) {
+	if ($state == NOTES) {
 	    push(@notes, $_);
-	    if (my($base) = m%^Initial working directory was (\S+)%) {
-		my $full = File::Spec->rel2abs($tgt, $base);
-		$full =~ s%^[a-z]:%%i if MSWIN;
-		$self->iwd($full, $base);
-		if (-e $full) {
-		    $tgt = $full;
-		} else {
-		    $self->{CRDB_FILES}->{$tgt}->{CR_PHONY} = 1;
-		}
+	    if (my($iwd) = m%^Initial working directory was (\S+)%) {
+		$self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_IWD} = $iwd;
 	    }
-	} elsif ($state == $Objects) {
-	    my($path, $vers, $date);
-	    if (($path, $vers, $date) = m%^([/\\].+)@@(\S+)\s+<(\S+)>$%) {
+	} elsif ($state == OBJECTS) {
+	    my($path, $vers, $date, $cmnts);
+	    my $inmakefile = 1;
+
+	    if (m%^(?:directory version|view directory)\s%) {
+		# We don't care about directories.
+		next;
+	    } elsif (($path, $vers, $date, $cmnts) =
+		    m%^(?:version|derived object version)\s+(\S+?.+?)@@(\S+)\s+<(\S+)>\s*(.*)$%) {
+		# We do not currently distinguish between regular elements
+		# and versioned derived objects.
 		$path =~ s%^[a-z]:%%i if MSWIN;
 		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'ELEM';
 		$self->{CRDB_FILES}->{$path}->{CR_ELEM}->{CR_VERS} = $vers;
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
-	    } elsif (($path, $date) = m%^([/\\].+)@@(\S+)$%) {
+	    } elsif ((($path, $date, $cmnts) =
+			m%^derived object\s+(\S.+?)@@(\S+)\s*?(.*)$%) ||
+		     (($path, $date, $cmnts) =
+			m%^derived object\s+(\S.+?)\s+<(\S+)>\s*?(.*)$%)) {
 		$path =~ s%^[a-z]:%%i if MSWIN;
 		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'DO';
+		if ($date =~ s%\.(\d+)$%%) {
+		    $self->{CRDB_FILES}->{$path}->{CR_DBID} = $1;
+		}
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
-	    } elsif (($path, $date) = m%^([/\\].+\S)\s+<(\S+)>$%) {
+		# In the case of siblings, each secondary sibling gets
+		# a pointer back to the primary, while the primary
+		# gets a list of its siblings.
+		if ($cmnts =~ m%new derived object%) {
+		    if ($path ne $tgt) {
+			$self->{CRDB_FILES}->{$path}->{CR_SIBLING_OF} = $tgt;
+			$self->{CRDB_FILES}->{$tgt}->{CR_SIBLINGS}->{$path} = 1;
+		    }
+		}
+		$inmakefile = ($cmnts =~ m%in makefile%) ? 1 : 0;
+	    } elsif (($path, $vers, $cmnts) =
+		    m%^derived object\s+(\S+?.+?)@@(\S+)\s*(.*)$%) {
+		warn "Warning: unhandled DO type: '$_'";
+	    } elsif (($path, $date, $cmnts) =
+		    m%^view file\s+(\S.+\S)\s+<(\S+)>\s*(.*)$%) {
 		$path =~ s%^[a-z]:%%i if MSWIN;
-		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'NON';
+		$self->{CRDB_FILES}->{$path}->{CR_TYPE} = 'VP';
 		$self->{CRDB_FILES}->{$path}->{CR_DATE} = $date;
+	    } elsif (m%^view private object%) {
+		# These seem to come up only for symlinks, which we can
+		# ignore since the target be recorded elsewhere.
+		next;
+	    } elsif (m%^branch%) {
+		# This appears to be reported only for non-visible DO's
+		next;
+	    } elsif (m%^file element%) {
+		# This appears to be reported only for non-visible DO's
+		next;
+	    } elsif (m%^directory element%) {
+		# This appears to be reported only for non-visible DO's
+		next;
+	    } elsif (m%^symbolic link%) {
+		next;
 	    } else {
 		warn "Warning: unrecognized CR line: '$_'";
 		next;
@@ -128,20 +266,78 @@ sub catcr {
 	    } else {
 		next if $path eq $tgt;
 	    }
-	    $self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_NEEDS}->{$path} = 1;
-	    next if exists $self->{CRDB_FILES}->{$tgt}->{CR_PHONY};
-	    $self->{CRDB_FILES}->{$path}->{CR_MAKES}->{$tgt} = 1;
-	} elsif ($state == $Vars && (my($var, $val) = m%^(.+?)=(.*)%)) {
+	    # The value of the NEEDS->{path} key indicated whether
+	    # the prereq is explicit in the makefile.
+	    if (!exists $self->{CRDB_FILES}->{$tgt}->{CR_SIBLINGS}->{$path}) {
+		$self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_NEEDS}->{$path} = $inmakefile;
+	    }
+	    # If this is a younger sibling, no need to record what it
+	    # contributes to - the older sibling has that data.
+	    if (!exists $self->{CRDB_FILES}->{$path}->{CR_SIBLING_OF}) {
+		$self->{CRDB_FILES}->{$path}->{CR_MAKES}->{$tgt} = 1;
+	    }
+	} elsif ($state == VARS && (my($var, $val) = m%^(.+?)=(.*)%)) {
 	    $self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_VARS}->{$var} = $val;
-	} elsif ($state == $Script) {
+	} elsif ($state == SCRIPT) {
 	    push(@{$self->{CRDB_FILES}->{$tgt}->{CR_DO}->{CR_SCRIPT}},
 								substr($_, 1));
 	} else {
 	    warn "Warning: unrecognized CR line: '$_'";
         }
     }
-    close (CR);
+    close ($handle);
     return $self;
+}
+
+sub catcr_cmd {
+    my $self = shift;
+    my $cmd = shift;
+
+    # The preferred directory for temp files.
+    my $tmpd = MSWIN ?
+	    ($ENV{TEMP} || $ENV{TMP} || ( -d "$ENV{SYSTEMDRIVE}/temp" ?
+		"$ENV{SYSTEMDRIVE}/temp" : $ENV{SYSTEMDRIVE}))
+	:
+	    ($ENV{TMPDIR} || '/tmp');
+    $tmpd =~ s%\\%/%g;
+
+    # The command line here can get awfully long, enough to blow the
+    # limit on some systems. So we hack around it by reading stdin.
+    my $dolist = "$tmpd/dolist.$$.tmp";
+    if (open(DOLIST, ">$dolist")) {
+	print DOLIST $cmd;
+	print DOLIST " '$_'" for @{[$self->crdo]};
+	print DOLIST "\n";
+	close(DOLIST);
+    } else {
+	warn "Warning: $dolist: $!";
+	return;
+    }
+    my $handle;
+    open($handle, "cleartool <$dolist |") || die "Error: $dolist: $!";
+    $self->catcr_handle($handle);
+    unlink $dolist;
+    return $self;
+}
+
+sub catcr_flat {
+    my $self = shift;
+    $self->crdo(@_) if @_;
+    my $cmd = "catcr -l";
+    return $self->catcr_cmd($cmd);
+}
+
+sub catcr_recurse {
+    my $self = shift;
+    $self->crdo(@_) if @_;
+    my $cmd = "catcr -r -l";
+    return $self->catcr_cmd($cmd);
+}
+
+# Backward compatibility.
+sub catcr {
+    my $self = shift;
+    return $self->catcr_recurse(@_);
 }
 
 # Internal func to recursively merge two hash refs
@@ -169,7 +365,7 @@ sub hash_merge {
 
 sub store {
     my $self = shift;
-    my $file = shift;
+    my $file = shift || '-';
     $self->{CRDB_SCHEMA} = $mod_schema;
     my $d = Data::Dumper->new([$self], ['_DO']);
     $d->Indent(1);
@@ -203,16 +399,15 @@ sub load {
 
 sub iwd {
     my $self = shift;
-    if (@_ == 2) {
-	my($path, $iwd) = @_;
-	$self->{CRDB_FILES}->{$path}->{CR_DO}->{CR_IWD} = $iwd;
-    } elsif (@_ == 1) {
-	my($path) = @_;
-	return $self->{CRDB_FILES}->{$path}->{CR_DO}->{CR_IWD};
+    if (@_ == 1) {
+	my $do = $self->primary_sibling(shift);
+	return $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_IWD};
     } elsif (@_ == 0) {
 	my %iwds;
 	for (keys %{$self->{CRDB_FILES}}) {
-	    $iwds{$_} = $self->{CRDB_FILES}->{$_}->{CR_DO}->{CR_IWD};
+	    next unless exists $self->{CRDB_FILES}->{$_}->{CR_DO};
+	    my $iwd = $self->iwd($_);	# recursion of a sort
+	    $iwds{$iwd}++ if $iwd;
 	}
 	return sort keys %iwds;
     }
@@ -224,16 +419,54 @@ sub files {
     return keys %{$self->{CRDB_FILES}};
 }
 
+sub type_is {
+    my $self = shift;
+    my $type = shift;
+    return grep {
+	exists $self->{CRDB_FILES}->{$_} &&
+	$self->{CRDB_FILES}->{$_}->{CR_TYPE} eq $type
+    } keys %{$self->{CRDB_FILES}};
+}
+
+sub versioned_elements {
+    my $self = shift;
+    return $self->type_is('ELEM');
+}
+
+sub derived_objects {
+    my $self = shift;
+    return $self->type_is('DO');
+}
+
+sub view_privates {
+    my $self = shift;
+    return $self->type_is('VP');
+}
+
 sub targets {
     my $self = shift;
-    return grep {exists $self->{CRDB_FILES}->{$_}->{CR_DO}}
+    my $siblings_too = shift;
+    my $key = $siblings_too ? 'CR_DBID' : 'CR_DO';
+    return grep {exists $self->{CRDB_FILES}->{$_}->{$key}}
 						    keys %{$self->{CRDB_FILES}};
+}
+
+sub terminals {
+    my $self = shift;
+    return grep {
+	 exists $self->{CRDB_FILES}->{$_}->{CR_DO} &&
+	!exists $self->{CRDB_FILES}->{$_}->{CR_MAKES}
+    } keys %{$self->{CRDB_FILES}};
 }
 
 sub vars {
     my $self = shift;
     my $do = shift;
-    return keys %{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS}};
+    if (wantarray) {
+	return keys %{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS}};
+    } else {
+	return $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS};
+    }
 }
 
 sub val {
@@ -241,39 +474,6 @@ sub val {
     my($do, $var) = @_;
     return undef unless exists $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS};
     return $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS}->{$var};
-}
-
-sub phony {
-    my $self = shift;
-    if (@_) {
-	return exists $self->{CRDB_FILES}->{$_[0]}->{CR_PHONY};
-    } else {
-	return grep {exists $self->{CRDB_FILES}->{$_}->{CR_PHONY}}
-						    keys %{$self->{CRDB_FILES}};
-    }
-}
-
-sub macroize {
-    my $self = shift;
-    my @dos = @_ ? @_ : keys %{$self->{CRDB_FILES}};
-    my %used;
-    for my $do (@dos) {
-	next unless exists $self->{CRDB_FILES}->{$do}->{CR_DO} &&
-		    exists $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_SCRIPT} &&
-		    exists $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS};
-	my %macros = %{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_VARS}};
-	for (@{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_SCRIPT}}) {
-	    for my $var (keys %macros) {
-		next unless $macros{$var};
-		if (length($var) == 1) {
-		    $used{$var} = $macros{$var} if s%\Q$macros{$var}%\$$var%g;
-		} else {
-		    $used{$var} = $macros{$var} if s%\Q$macros{$var}%\$($var)%g;
-		}
-	    }
-	}
-    }
-    return %used;
 }
 
 sub notes {
@@ -285,13 +485,14 @@ sub notes {
 
 sub script {
     my $self = shift;
-    my $do = shift;
+    my $do = $self->primary_sibling(shift);
     return undef
 	    if !exists $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_SCRIPT};
-    return @{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_SCRIPT}};
+    my @script = @{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_SCRIPT}};
+    return @script;
 }
 
-sub matches_do {
+sub matches {
     my $self = shift;
     my @matched;
     for my $re (@_) {
@@ -299,18 +500,20 @@ sub matches_do {
     }
     return @matched;
 }
+*matches_do = \&matches;
 
-sub needs_do {
+sub needs {
     my $self = shift;
     my @results;
     for my $do (@_) {
-	push(@results, keys %{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_NEEDS}})
-				    if exists $self->{CRDB_FILES}->{$do};
+	next unless exists $self->{CRDB_FILES}->{$do};
+	push(@results, keys %{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_NEEDS}});
     }
     return @results;
 }
+*needs_do = \&needs;
 
-sub makes_do {
+sub makes {
     my $self = shift;
     my @results;
     for my $do (@_) {
@@ -319,6 +522,108 @@ sub makes_do {
     }
     return @results;
 }
+*makes_do = \&makes;
+
+sub unmentioned {
+    my $self = shift;
+    my @results;
+    for my $do (@_) {
+	for my $prq (keys %{$self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_NEEDS}}) {
+	    next if $self->{CRDB_FILES}->{$do}->{CR_DO}->{CR_NEEDS}->{$prq};
+	    push(@results, $prq)
+	}
+    }
+    return @results;
+}
+
+# If the supplied path is a sibling DO, replace it with the "primary"
+# DO record which contains the useful data such as iwd, script, etc.
+sub primary_sibling {
+    my $self = shift;
+    my $do = shift;
+    $do = $self->{CRDB_FILES}->{$do}->{CR_SIBLING_OF}
+	if exists $self->{CRDB_FILES}->{$do}->{CR_SIBLING_OF};
+    return $do;
+}
+
+sub sibling_of {
+    my $self = shift;
+    my $do = shift;
+    return $self->{CRDB_FILES}->{$do}->{CR_SIBLING_OF};
+}
+
+sub siblings {
+    my $self = shift;
+    my $do = shift;
+    if (!exists $self->{CRDB_FILES}->{$do}->{CR_SIBLINGS} &&
+	    exists $self->{CRDB_FILES}->{$do}->{CR_SIBLING_OF}) {
+	$do = $self->{CRDB_FILES}->{$do}->{CR_SIBLING_OF};
+    }
+    if (exists $self->{CRDB_FILES}->{$do}->{CR_SIBLINGS}) {
+	return keys %{$self->{CRDB_FILES}->{$do}->{CR_SIBLINGS}};
+    } else {
+	return ();
+    }
+}
+
+sub recognizes {
+    my $self = shift;
+    my $do = shift;
+    return exists $self->{CRDB_FILES}->{$do};
+}
+
+sub iwd_targets {
+    my $self = shift;
+    my $iwd = shift;
+    my @tgts = grep {
+	exists($self->{$_}->{CR_IWD}) && $self->{$_}->{CR_IWD} eq $iwd
+    } keys %$self;
+    return @tgts;
+}
+
+sub absify {
+    my $self = shift;
+    my($iwd, $orig) = @_;
+
+    my $line = '';
+    my @chunks = split ' ', $orig;
+    for my $i (0 .. $#chunks) {
+	my $chunk = $chunks[$i];
+	if ($chunk =~ m%^[\\/]%) {
+	    $line .= $chunk;
+	    next;
+	} else {
+	    if ($chunk =~ m%^-%) {
+		if ($chunk =~ s%^(-[ILR])%%) {
+		    $line .= $1;
+		    if ($chunk =~ m%^[\\/]%) {
+			$line .= $chunk;
+			next;
+		    }
+		} else {
+		    $line .= $chunk;
+		    next;
+		}
+	    }
+	}
+	my $full = File::Spec->canonpath("$iwd/$chunk");
+	if ($self->recognizes($full)) {
+	    $line .= $full;
+	} elsif (-d $full) {
+	    $line .= $full;
+	} elsif (-e $full) {
+	    $line .= File::Spec->join(Cwd::abs_path(dirname $full),
+		basename $full);;
+	    #warn "Warning: not recognized: $full\n";
+	} else {
+	    $line .= $chunk;
+	    #warn "Unrecognized: '$chunk'\n";
+	}
+    } continue {
+	$line .= ' ' if $i < $#chunks;
+    }
+    return $line;
+}
 
 1;
 
@@ -326,24 +631,24 @@ __END__
 
 =head1 NAME
 
-ClearCase::CRDB - base class for ClearCase config-record analysis
+ClearCase::CRDB - Class for ClearCase config-record analysis
 
 =head1 SYNOPSIS
 
-    my $crdb = ClearCase::CRDB->new(@ARGV);	# @ARGV is a list of DO's
+    my $crdb = ClearCase::CRDB->new(@ARGV);	# Initialize object
     $crdb->check;				# Do a CR sanity check
     $crdb->catcr;				# Analyze the recursive CR
     $crdb->store($filename);			# Dump CR to $filename
 
 =head1 DESCRIPTION
 
-A ClearCase::CRDB object represents the recursive I<configuration
-record> (aka I<CR>) of a set of I<derived objects> (aka I<DO's>).  It
-provides methods for easy extraction of parts of the CR such as the
-build script, MVFS files used in the creation of a given DO, make
-macros employed, etc. This is the same data available from ClearCase in
-raw textual form from "cleartool catcr -recurse DO ..."; it's just
-broken down for easier access and analysis.
+A ClearCase::CRDB object represents the (potentially recursive)
+I<configuration record> (hereafter C<I<CR>>) of a set of I<derived
+objects> (hereafter C<I<DOs>>).  It provides methods for easy
+extraction of parts of the CR such as the build script, MVFS files used
+in the creation of a given DO, make macros employed, etc. This is the
+same data available from ClearCase in raw textual form via C<cleartool
+catcr>; it's just broken down for easier access and analysis.
 
 An example of what can be done with ClearCase::CRDB is the provided
 I<whouses> script which, given a particular DO, can show recursively
@@ -358,25 +663,26 @@ re-loaded from there. For example, this data might be derived once per
 day as part of a nightly build process and would then be available for
 use during the day without causing additional VOB load.
 
-The native C<ClearCase::CRDB-E<gt>store> and
-C<ClearCase::CRDB-E<gt>load> methods store to a flat file in
+The provided C<ClearCase::CRDB-E<gt>store> and
+C<ClearCase::CRDB-E<gt>load> methods save to a flat file in
 human-readable text format. Different formats may be used by
 subclassing these two methods. An example subclass
 C<ClearCase::CRDB::Storable> is provided; this uses the Perl module
 I<Storable> which is a binary format. If you wanted to store to a
-database this is how you'd do it.
+relational database this is how you'd do it, using Perl's DBI modules.
 
 =head2 CONSTRUCTOR
 
-Use C<ClearCase::CRDB-E<gt>new> to construct a CRDB object. Any
-parameters given will be taken as the set of derived objects to
-analyze.
+Use C<ClearCase::CRDB-E<gt>new> to construct a CRDB object. I<If @ARGV
+is passed in, the constructor will automatically parse certain standard
+flags from @ARGV and use them to initialize the object.> See the
+B<usage> method for details.
 
 =head2 INSTANCE METHODS
 
 Following is a brief description of each supported method. Examples
 are given for all methods that take parameters; if no example is
-given usage may be assumed to look like:
+given, usage may be assumed to look like:
 
     my $result = $obj->method;
 
@@ -385,22 +691,28 @@ assumed that the method returns a list.
 
 =over 4
 
+=item * usage
+
+Returns a string detailing the internal standard command-line flags
+parsed by the C<-E<gt>new> constructor for use in the script's usage
+message.
+
 =item * crdo
 
 Sets or gets the list of derived objects under consideration, e.g.:
 
-    $obj->crdo(qw(do_1, do_2);	# give the object a list of DO's
+    $obj->crdo(qw(do_1 do_2);	# give the object a list of DO's
     my @dos = $obj->crdo;	# gets the list of DO's
 
-This method is invoked automatically by the constructor (see) if
-derived objects are specified.
+This method is invoked automatically by the constructor if derived
+objects are passed to it.
 
 =item * catcr
 
-Invokes I<cleartool catcr -recurse> on the DO set and breaks the
-resultant textual data apart into various fields which may then be
-accessed by the methods below. This method is invoked automatically by
-the constructor (see) if derived objects are specified.
+Invokes I<cleartool catcr> on the DO set and breaks the resultant
+textual data apart into various fields which may then be accessed by
+the methods below. This method is invoked automatically by the
+constructor (see) if derived objects are specified.
 
 =item * check
 
@@ -411,28 +723,36 @@ config records.
 
 =item * store
 
-Writes the processed config record data to the specified file.
+Writes the processed config record data to the specified file (default
+= stdout).
 
 =item * load
 
 Reads processed config record data from the specified files.
 
-=item * needs_do
+=item * needs
+
+Takes a list of derived objects, returns the list of prerequisite
+derived objects (the derived objects on which they depend). For
+example, if C<foo.c> includes C<foo.h> and compiles to C<foo.o> which
+then links to the executable C<foo>, the C<-E<gt>needs> method when
+given C<foo.o> would return the list C<('foo.c', 'foo.h')>. In other
+words it returns "upstream dependencies" or prerequisite derived
+objects.
+
+=item * makes
 
 Takes a list of derived objects, returns the list of derived objects
-which they use. For example, if C<foo.c> includes C<foo.h> and compiles
-to C<foo.o> which then links to the executable C<foo>, the
-C<-E<gt>needs_do> method when given C<foo.o> would return the list
-C<('foo.c', 'foo.h')>. In other words it returns "upstream
-dependencies".
-
-=item * makes_do
-
-Takes a list of derived objects, returns the list of derived objects
-which use them. This is the reverse of C<needs_do>. Given the
-C<needs_do> example above, the C<-E<gt>makes_do> method when given
+which use them. This is the reverse of C<needs>. Given the
+C<needs> example above, the C<-E<gt>makes> method when given
 C<foo.o> would return C<foo>. In other words it returns "downstream
 dependencies".
+
+=item * unmentioned
+
+Takes a list of derived objects, returns the list of prerequisite
+DOs which were B<not> mentioned in the makefile. Useful for finding
+makefile bugs.
 
 =item * iwd
 
@@ -447,13 +767,27 @@ Returns the complete set of files mentioned in the CR.
 =item * targets
 
 Returns the subset of files mentioned in the CR which are targets.
+Takes one optional boolean parameter, which if true causes sibling
+derived objects to be returned also.
+
+=item * terminals
+
+Returns the subset of targets which are terminal, i.e. those which do
+not contribute to other derived objects.
 
 =item * vars
 
-Returns the set of make macros used in the build script for the
-specified DO, e.g.:
+In a list context, returns the set of make macros used in the build
+script for the specified DO, e.g.:
 
     my @list = $obj->vars("path-to-derived-object");
+
+In scalar context, returns a ref to the hash mapping vars to values:
+
+    my $vhash = $obj->vars("path-to-derived-object");
+    for my $var (keys %$vhash) {
+	print "$var=", $vhash->{$var}, "\n";
+    }
 
 =item * val
 

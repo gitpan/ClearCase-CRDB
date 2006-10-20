@@ -10,7 +10,7 @@ SYNOPSIS
 
       whouses foobar.h
 
-    Shows all DO's that make use of any file matching /foobar.h/.
+    Shows all DOs that make use of any file matching /foobar.h/.
 
       whouses -recurse foobar.h
 
@@ -18,9 +18,9 @@ SYNOPSIS
 
       whouses -exact foobar.h
 
-    Shows all DO's that make use of the specified file. The "-exact" flag
-    suppresses pattern matching and shows only DO's which reference the
-    exact file.
+    Shows all DOs that make use of the specified file. The "-exact" flag
+    suppresses pattern matching and shows only DOs which reference the exact
+    file.
 
 DESCRIPTION
     Whouses provides a limited form of "impact analysis" in a clearmake
@@ -34,9 +34,9 @@ DESCRIPTION
     to produce "foo". And let's further assume you've just done a build
     using clearmake.
 
-    Thus, "foo" is a DO which has a config record (*CR*) showing how it was
-    made. Whouses analyzes that CR and prints the data in easy-to-read
-    indented textual format. For instance:
+    Thus, "foo" is a derived object (*DO*) which has a config record (*CR*)
+    showing how it was made. Whouses analyzes that CR and prints the data in
+    easy-to-read indented textual format. For instance:
 
             % whouses -do foo foo.c
             /vobs_sw/src/foo.c  =>
@@ -45,7 +45,7 @@ DESCRIPTION
     The "-do foo" points to the derived object from which to extract and
     analyze the CR; it will be implicit in the remaining examples. The
     output indicates that "foo.o uses foo.c", or in other words that "foo.c"
-    is a contributor to "foo.o". If we add the "-recurse" flag:
+    is a *contributor* to "foo.o". If we add the "-recurse" flag:
 
             % whouses -r foo.c
             /vobs_sw/src/foo.c =>
@@ -62,20 +62,20 @@ DESCRIPTION
     Intermediate targets such as "foo.o" are suppressed so we see only the
     "final" targets descended from "foo.c".
 
-    We can also go in the other direction using "-backwards":
+    We can also go in the other direction using "-backward":
 
             % whouses -b -e foo
             /vobs_sw/src/foo <=
               /vobs_sw/src/foo.o
 
     Which shows "foo.o" as a progenitor of "foo". Note that the arrow (<=)
-    is turned around to indicate "-backwards" mode. We also introduced the
-    "-exact" flag here. By default arguments to whouses are treated as
+    is turned around to indicate "-backward" mode. We also introduced the
+    "-exact" flag here. By default, arguments to whouses are treated as
     patterns, not file names, and since "foo" has no extension it would have
     matched "foo.c" and "foo.o" as well. Use of "-exact" suppresses pattern
     matching.
 
-    We can combine recursion with backwards mode:
+    Of course we can go backward recursively as well:
 
             % whouses -back -exact -recurse foo
             /vobs_sw/src/foo <=
@@ -104,21 +104,16 @@ DESCRIPTION
 
     The default save format is that of Data::Dumper. It was chosen because
     it results in a nicely indented, human-readable text format file.
-    Provision is made for subclassing to alternate storage formats, and
-    subclasses for Storable and Data::Denter are provided as examples.
-    Although the Storable format may be somewhat faster than the default,
-    the real reason for the override capability is to allow an actual, fast
-    database to be used.
 
-SELECTING DERIVED OBJECTS
+SELECTING DERIVED OBJECTS TO ANALYZE
     If a "-do" flag is given, the CRs are taken from the specified derived
-    object(s). Multiple DO's may be specified with multiple "-do" flags or
-    as a comma-separated list. Alternatively, if the "CRDB_DO" environment
+    object(s). Multiple DOs may be specified with multiple "-do" flags or as
+    a comma-separated list. Alternatively, if the "CRDB_DO" environment
     variable exists, its value is used as if specified with "-do".
 
-    If no DO's are specified directly, "whouses" will look for stored DO
-    data in files specified with "-db" or the "CRDB_DB" EV. The format is
-    the same as above.
+    If no DOs are specified directly, "whouses" will look for stored DO data
+    in files specified with "-db" or the "CRDB_DB" EV. The format is the
+    same as above.
 
     Failing that, "whouses" will search for files named "*.crdb" along a
     path specified with "-dir" or "CRDB_PATH", defaulting to the current
@@ -127,35 +122,34 @@ SELECTING DERIVED OBJECTS
 .AUDIT FILES
     As a special case, derived objects matching the Perl regular expression
     "/\.AUDIT/i" are ignored while traversing the recursive config spec.
-    These are presumed to be *meta-DO's* by convention, which aren't part of
-    the build per se but rather pseudo-targets whose only purpose is to hold
-    CR's which refer back to all real deliverables. Thus if you construct
-    your Makefile to create a meta-DO, you might want to name it ".AUDIT" or
-    ".prog.AUDIT" or something.
+    These are presumed to be *meta-DOs* by convention, which aren't part of
+    the production build per se but rather pseudo-targets whose only purpose
+    is to hold CRs referring back to all real deliverables. Thus if you
+    construct your Makefile to create a meta-DO, you might want to name it
+    ".AUDIT" or ".prog.AUDIT" or something.
 
 ClearCase::CRDB
     Most of the logic is actually in the "ClearCase::CRDB" module; the
-    "whouses" program is just a wrapper that uses the module. It's done this
-    way so ClearCase::CRDB can provide an API for other potential tools
+    "whouses" program is just a wrapper which uses the module. It's done
+    this way so ClearCase::CRDB can provide an API for other potential tools
     which need to do CR analysis.
 
 TRUE CODE ANALYSIS COMPARED
-    Whouses can best be described by comparison with "real" impact analysis
-    products. There are a number of such tools on the market, for example
-    SNiFF+ from WindRiver. Typically these work by parsing the source code
-    into some database representation which they can then analyze. It's a
-    powerful technique but entails some tradeoffs:
+    Whouses is somewhat different from "real" impact analysis products.
+    There are a number of such tools on the market, for example SNiFF+ from
+    WindRiver. Typically these work by parsing the source code into some
+    database representation which they can then analyze. It's a powerful
+    technique but entails some tradeoffs:
 
   MINUSES
     *   A true code analysis tool must have knowledge of each programming
         language in use. I.e. to add support for Java, a Java parser must be
         added.
 
-    *   A corollary of the above is that this tool requires lot of work by
-        expert programmers. Thus the tools tend to be large, complex and
-        expensive. Note: there is also *cscope* which is free, and maybe
-        others. But as the name implies *cscope* is limited to C-like
-        languages.
+    *   A corollary of the above is that it requires lot of work by expert
+        programmers. Thus the tools tend to be large, complex and expensive.
+        Note: there is also *cscope* which is free, and maybe others. But as
+        the name implies *cscope* is limited to C-like languages.
 
     *   Another corollary is that the tool must track each advance in each
         language, usually with significant lag time, and may not be
@@ -199,7 +193,7 @@ AUTHOR
     David Boyce <dsbperl AT boyski.com>
 
 COPYRIGHT
-    Copyright (c) 2000-2001 David Boyce. All rights reserved. This Perl
+    Copyright (c) 2000-2006 David Boyce. All rights reserved. This Perl
     program is free software; you may redistribute and/or modify it under
     the same terms as Perl itself.
 
@@ -216,5 +210,5 @@ PORTING
     appears to work fine in limited testing.
 
 SEE ALSO
-    perl(1), ClearCase::CRDB(3)
+    perl(1), ClearCase::CRDB(3), "cleartool man catcr"
 

@@ -39,4 +39,20 @@ Revision history for Perl extension ClearCase::CRDB.
 	- Fixed a number of Windows-specific bugs involving paths
 	  (/-vs-\, case sensitivity, and drive letters).
 	- Fix: do not assume a variables section between MVFS Objects
-	  and Build Script.
+	  and Build Script in a CR.
+
+0.15 Fri Oct 20 07:38:16 EDT 2006
+	- Major cleanup of code.
+	- Added cr2mf script suite for regeneration of Makefiles
+	  from config records (proof of concept only)
+	- Removed support for Data::Denter, which is deprecated
+	  nowadays and in any case was only ever here as a proof
+	  of concept.
+	- Actually, all support for alternate storage formats
+	  has been removed. I don't believe it was being used and
+	  I'm not in a position to test it. There's nothing to
+	  stop it from being put back in later.
+	- Now uses catcr in -long mode, allowing more intelligent
+	  handling of sibling derived objects.
+	- Whouses adds a new interactive mode so you can "browse"
+	  your way through dependencies.

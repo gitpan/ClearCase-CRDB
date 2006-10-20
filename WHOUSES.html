@@ -16,7 +16,7 @@
 	<li><a href="#motto">MOTTO</a></li>
 	<li><a href="#synopsis">SYNOPSIS</a></li>
 	<li><a href="#description">DESCRIPTION</a></li>
-	<li><a href="#selecting_derived_objects">SELECTING DERIVED OBJECTS</a></li>
+	<li><a href="#selecting_derived_objects_to_analyze">SELECTING DERIVED OBJECTS TO ANALYZE</a></li>
 	<li><a href="#.audit_files">.AUDIT FILES</a></li>
 	<li><a href="#clearcase::crdb">ClearCase::CRDB</a></li>
 	<li><a href="#true_code_analysis_compared">TRUE CODE ANALYSIS COMPARED</a></li>
@@ -52,14 +52,14 @@
 some additional sample usages with explanations:</p>
 <pre>
   whouses foobar.h</pre>
-<p>Shows all DO's that make use of any file matching /foobar.h/.</p>
+<p>Shows all DOs that make use of any file matching /foobar.h/.</p>
 <pre>
   whouses -recurse foobar.h</pre>
 <p>Same as above but follows the chain of derived files recursively.</p>
 <pre>
   whouses -exact foobar.h</pre>
-<p>Shows all DO's that make use of the specified file. The <code>-exact</code> flag
-suppresses pattern matching and shows only DO's which reference the
+<p>Shows all DOs that make use of the specified file. The <code>-exact</code> flag
+suppresses pattern matching and shows only DOs which reference the
 exact file.</p>
 <p>
 </p>
@@ -74,9 +74,9 @@ it operates at the granularity of files rather than language elements.</p>
 from <code>foo.c</code>.  You have a Makefile which compiles <code>foo.c</code> to <code>foo.o</code>
 and then links it to produce <code>foo</code>. And let's further assume you've
 just done a build using clearmake.</p>
-<p>Thus, <code>foo</code> is a DO which has a config record (<em>CR</em>) showing how it
-was made. Whouses analyzes that CR and prints the data in easy-to-read
-indented textual format.  For instance:</p>
+<p>Thus, <code>foo</code> is a derived object (<em>DO</em>) which has a config record
+(<em>CR</em>) showing how it was made. Whouses analyzes that CR and prints
+the data in easy-to-read indented textual format.  For instance:</p>
 <pre>
         % whouses -do foo foo.c
         /vobs_sw/src/foo.c  =&gt;
@@ -84,7 +84,7 @@ indented textual format.  For instance:</p>
 <p>The <code>-do foo</code> points to the derived object from which to extract and
 analyze the CR; it will be implicit in the remaining examples.  The
 output indicates that <code>foo.o uses foo.c</code>, or in other words that
-<code>foo.c</code> is a contributor to <code>foo.o</code>. If we add the <code>-recurse</code> flag:</p>
+<code>foo.c</code> is a <em>contributor</em> to <code>foo.o</code>. If we add the <code>-recurse</code> flag:</p>
 <pre>
         % whouses -r foo.c
         /vobs_sw/src/foo.c =&gt;
@@ -98,18 +98,18 @@ how many generations removed they are. If we now add <code>-terminals</code></p>
           /vobs_sw/src/foo</pre>
 <p>Intermediate targets such as <code>foo.o</code> are suppressed so we see only the
 ``final'' targets descended from <code>foo.c</code>.</p>
-<p>We can also go in the other direction using <code>-backwards</code>:</p>
+<p>We can also go in the other direction using <code>-backward</code>:</p>
 <pre>
         % whouses -b -e foo
         /vobs_sw/src/foo &lt;=
           /vobs_sw/src/foo.o</pre>
 <p>Which shows <code>foo.o</code> as a progenitor of <code>foo</code>. Note that the arrow
-(<strong>&lt;=</strong>) is turned around to indicate <code>-backwards</code> mode. We also
-introduced the <code>-exact</code> flag here. By default arguments to whouses
+(<strong>&lt;=</strong>) is turned around to indicate <code>-backward</code> mode. We also
+introduced the <code>-exact</code> flag here. By default, arguments to whouses
 are treated as patterns, not file names, and since <code>foo</code> has no
-extension it would have matched <code>foo.c</code> and <code>foo.o</code> as well. Use
-of <code>-exact</code> suppresses pattern matching.</p>
-<p>We can combine recursion with backwards mode:</p>
+extension it would have matched <code>foo.c</code> and <code>foo.o</code> as well. Use of
+<code>-exact</code> suppresses pattern matching.</p>
+<p>Of course we can go backward recursively as well:</p>
 <pre>
         % whouses -back -exact -recurse foo
         /vobs_sw/src/foo &lt;=
@@ -133,21 +133,17 @@ exists it will be used unless a new the <code>-do</code> flag is used.  See also
 the <code>-db</code> and <code>-fmt</code> flags.</p>
 <p>The default save format is that of <strong>Data::Dumper</strong>. It was chosen
 because it results in a nicely indented, human-readable text format
-file. Provision is made for subclassing to alternate storage formats,
-and subclasses for <strong>Storable</strong> and <strong>Data::Denter</strong> are provided as
-examples. Although the Storable format may be somewhat faster than
-the default, the real reason for the override capability is to allow an
-actual, fast database to be used.</p>
+file.</p>
 <p>
 </p>
 <hr />
-<h1><a name="selecting_derived_objects">SELECTING DERIVED OBJECTS</a></h1>
+<h1><a name="selecting_derived_objects_to_analyze">SELECTING DERIVED OBJECTS TO ANALYZE</a></h1>
 <p>If a <code>-do</code> flag is given, the CRs are taken from the specified derived
-object(s).  Multiple DO's may be specified with multiple <code>-do</code> flags
+object(s).  Multiple DOs may be specified with multiple <code>-do</code> flags
 or as a comma-separated list. Alternatively, if the <code>CRDB_DO</code>
 environment variable exists, its value is used as if specified with
 <code>-do</code>.</p>
-<p>If no DO's are specified directly, <code>whouses</code> will look for stored DO
+<p>If no DOs are specified directly, <code>whouses</code> will look for stored DO
 data in files specified with <code>-db</code> or the <code>CRDB_DB</code> EV. The format is
 the same as above.</p>
 <p>Failing that, <code>whouses</code> will search for files named <code>*.crdb</code> along a
@@ -159,28 +155,28 @@ directory.</p>
 <h1><a name=".audit_files">.AUDIT FILES</a></h1>
 <p>As a special case, derived objects matching the Perl regular expression
 <code>/\.AUDIT/i</code> are ignored while traversing the recursive config spec.
-These are presumed to be <em>meta-DO's</em> by convention, which aren't part
-of the build per se but rather pseudo-targets whose only purpose is to
-hold CR's which refer back to all real deliverables. Thus if you
-construct your Makefile to create a meta-DO, you might want to name it
-<code>.AUDIT</code> or <code>.prog.AUDIT</code> or something.</p>
+These are presumed to be <em>meta-DOs</em> by convention, which aren't part
+of the production build per se but rather pseudo-targets whose only
+purpose is to hold CRs referring back to all real deliverables. Thus
+if you construct your Makefile to create a meta-DO, you might want to
+name it <code>.AUDIT</code> or <code>.prog.AUDIT</code> or something.</p>
 <p>
 </p>
 <hr />
 <h1><a name="clearcase::crdb">ClearCase::CRDB</a></h1>
 <p>Most of the logic is actually in the <code>ClearCase::CRDB</code> module; the
-<code>whouses</code> program is just a wrapper that uses the module. It's done
+<code>whouses</code> program is just a wrapper which uses the module. It's done
 this way so ClearCase::CRDB can provide an API for other potential
 tools which need to do CR analysis.</p>
 <p>
 </p>
 <hr />
 <h1><a name="true_code_analysis_compared">TRUE CODE ANALYSIS COMPARED</a></h1>
-<p>Whouses can best be described by comparison with ``real'' impact analysis
-products. There are a number of such tools on the market, for example
-SNiFF+ from WindRiver.  Typically these work by parsing the source code
-into some database representation which they can then analyze. It's a
-powerful technique but entails some tradeoffs:</p>
+<p>Whouses is somewhat different from ``real'' impact analysis products.
+There are a number of such tools on the market, for example SNiFF+ from
+WindRiver.  Typically these work by parsing the source code into some
+database representation which they can then analyze. It's a powerful
+technique but entails some tradeoffs:</p>
 <p>
 </p>
 <h2><a name="minuses">MINUSES</a></h2>
@@ -191,11 +187,10 @@ language in use. I.e. to add support for Java, a Java parser must be
 added.
 <p></p>
 <li></li>
-A corollary of the above is that this tool requires lot of work by
-expert programmers. Thus the tools tend to be large, complex and
-expensive. Note: there is also <em>cscope</em> which is free, and maybe
-others. But as the name implies <em>cscope</em> is limited to C-like
-languages.
+A corollary of the above is that it requires lot of work by expert
+programmers. Thus the tools tend to be large, complex and expensive.
+Note: there is also <em>cscope</em> which is free, and maybe others. But as
+the name implies <em>cscope</em> is limited to C-like languages.
 <p></p>
 <li></li>
 Another corollary is that the tool must track each advance
@@ -203,9 +198,9 @@ in each language, usually with significant lag time, and
 may not be bug-for-bug compatible with the compiler.
 <p></p>
 <li></li>
-Also, since analysis basically entails compiling the code,
-analysis of a large code base can take a long time,
-potentially as long or longer than actually building it.
+Also, since analysis basically entails compiling the code, analysis of
+a large code base can take a long time, potentially as long or longer
+than actually building it.
 <p></p>
 <li></li>
 If some part of the application is written in a language the tool
@@ -249,7 +244,7 @@ have taken place since, divergence is possible here too.</p>
 </p>
 <hr />
 <h1><a name="copyright">COPYRIGHT</a></h1>
-<p>Copyright (c) 2000-2001 David Boyce. All rights reserved.  This Perl
+<p>Copyright (c) 2000-2006 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute and/or modify it under
 the same terms as Perl itself.</p>
 <p>
@@ -272,7 +267,7 @@ appears to work fine in limited testing.</p>
 </p>
 <hr />
 <h1><a name="see_also">SEE ALSO</a></h1>
-<p>perl(1), ClearCase::CRDB(3)</p>
+<p>perl(1), ClearCase::CRDB(3), <code>cleartool man catcr</code></p>
 
 </body>
 

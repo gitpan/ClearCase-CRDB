@@ -1,8 +1,10 @@
-#!/usr/local/bin/perl
+#!/opt/rational/common/bin/ratlperl
 
 use File::Basename;
 use File::Spec 0.82;
 use Getopt::Long;
+
+use ClearCase::CRDB;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 
@@ -21,121 +23,114 @@ sub usage {
 Usage: $prog [flags] pattern ...
 Flags:
    -help		Print this message and exit
-   -backwards		Work from objects back towards sources
-   -check		(with -do) Check specified DO's for consistency
-   -do DO,...		Comma-separated list of DO's to analyze
+   -backward		Work from objects back towards sources
+   -do DO,...		Comma-separated list of DOs to analyze
    -db file,...		Comma-separated list of *.crdb files to read in
    -dir	<dir>		Dir to search for *.crdb files (default: the cwd)
    -exact		Treat <pattern> as an absolute path, not a pattern
-   -indent <str>	String to indent recursive output (default: 3 spaces)
+   -interactive 	Run like a shell: prompt for new filenames until EOF
+   -Indent <str>	String to indent recursive output (default: 3 spaces)
    -recurse		Chase down dependencies recursively
-   -save		(with -do) Save DB resulting from DO 'foo' as 'foo.crdb'
+   -save		Save DB derived from DO 'foo' as 'foo.crdb'
    -terminals		Like -recurse but print only terminal targets
    -verbose		Provide informational messages
 Note:
     All flags may be abbreviated to their shortest unique name.
+    Flags may be turned off by prepending 'no', e.g. -nor/ecurse.
 Examples:
     $prog -do /vobs_foo/solaris/.AUDIT libxyz.a
-    $prog -backwards -rec foo.o
+    $prog -backward -rec foo.o
 EOF
-    exit $rc;
+    exit $rc if $rc;
 }
 
+# Make a new CRDB object and initialize it from @ARGV.
+my $crdb = ClearCase::CRDB->new(@ARGV);
+
+my @interopts = qw(backward! exact! Indent=s number! recurse! terminals!);
+
 my %opt;
-GetOptions(\%opt, qw(backwards check do|cr=s@ db=s@ dir=s exact fmt=s help
-		     indent=s macro number recurse save terminals verbose));
-usage() if $opt{help} || !@ARGV;
+$Getopt::Long::ignorecase = 0;  # global override for dumb default
+GetOptions(\%opt, qw(dir=s help interactive verbose), @interopts);
+usage(1) if $opt{help};
+usage(1) if !@ARGV && !$opt{interactive};
 
 sub note {
     print STDERR "$prog: @_\n" if $opt{verbose};
 }
 
-$opt{recurse} ||= $opt{terminals};	# one implies the other
+my $ln = 0;
+my %seen;
 
-my $delim = MSWIN ? ',;' : ',;:';
-my $ext = 'crdb';
-
-# Use whichever storage format is requested, providing a default.
-my $fmt = 'ClearCase::CRDB::' . ($opt{fmt} || 'Dumper');
-eval "require $fmt";
-my $cr = $fmt->new;
-
-if ($opt{do} || $ENV{CRDB_DO}) {
-    my $crlist = $opt{do} ? join(',', @{$opt{do}}) : $ENV{CRDB_DO};
-    my @crs = map {split /[$delim]/} $crlist;
-    $cr->crdo(@crs);
-    if ($opt{check}) {
-	note "Checking @crs CR for internal consistency ...";
-	$cr->check;
-    }
-    note "Translating @crs CR to CRDB format ...";
-    $cr->catcr;
-    if ($opt{db}) {
-	die "$prog: Error: can write to only one database file"
-							if @{$opt{db}} != 1;
-	note "Writing CRDB data to $opt{db}->[0].$ext ...";
-	$cr->store($opt{db}->[0]);
-    } elsif ($opt{save}) {
-	note "Writing CRDB data to $crs[0].$ext ...";
-	$cr->store("$crs[0].$ext");
-    }
-} elsif ($opt{db} || $ENV{CRDB_DB}) {
-    my $dblist = $opt{db} ? join(',', @{$opt{db}}) : $ENV{CRDB_DB};
-    my @dbs = map {split /[$delim]/} $dblist;
-    for (@dbs) {
-	$_ .= ".$ext" unless /$ext$/;
-    }
-    $cr->load(@dbs);
-} else {
-    my $path = $opt{dir} || $ENV{CRDB_PATH} || '.';
-    my @found;
-    for my $dir (split /[$delim]/, $path) {
-	push(@found, glob("$dir/.*.$ext"), glob("$dir/*.$ext"));
-    }
-    die "$prog: Error: no CRDB databases found" unless @found;
-    my $s = @found > 1 ? 's' : '';
-    note "Using @found database$s ...";
-    $cr->load(@found);
-}
-
-$opt{indent} ||= '   ';
-
-my @matches;
-my $ln = '';
-
-{
-    my %seen;
-    my $direction = $opt{backwards} ? 'needs' : 'makes';
-    my $type = $opt{macro} ? 'var' : 'do';
-    my $query = "${direction}_$type";
-    if ($opt{exact}) {
-	@matches = map {File::Spec->rel2abs($_, $cr->iwd)} @ARGV;
-    } else {
-       my $match_method = "matches_$type";
-       @matches = $cr->$match_method(@ARGV);
-    }
-    sub whouses {
-	my $level = shift;
-	my $do = shift;
-	my $pad = $opt{indent} x $level;
-	for my $used ($cr->$query($do)) {
-	    next if $used =~ m%/\.AUDIT%i; # HACK - see PODs
-	    if ($opt{terminals} && grep !m%/\.AUDIT%i, $cr->$query($used)) {
-		whouses($level, $used);
-	    } else {
-		++$ln if $opt{number};
-		print "$ln$pad$used\n" unless $opt{terminals} && $seen{$used};
-		$seen{$used} = 1;
-		whouses($level+1, $used) if $opt{recurse};
-	    }
+sub whouses {
+    my($obj, $level, $do) = @_;
+    my $pad = $opt{Indent} x $level;
+    my $query = $opt{backward} ? 'needs' : 'makes';
+    for my $used ($obj->$query($do)) {
+	next if $used =~ m%/\.AUDIT%i;	# See POD
+	if ($opt{terminals} && grep !m%/\.AUDIT%i, $obj->$query($used)) {
+	    whouses($obj, $level, $used);
+	} else {
+	    print ++$ln if $opt{number};
+	    print "$pad$used\n" unless $opt{terminals} && $seen{$used};
+	    $seen{$used} = 1;
+	    whouses($obj, $level+1, $used) if $opt{recurse} || $opt{terminals};
 	}
     }
 }
 
-for (@matches) {
-    print(++$ln, ' ') if $opt{number};
-    print $_, $opt{backwards} ? ' <=' : ' =>', "\n";
-    whouses(1, $_);
+$opt{Indent} ||= '   ';
+
+while (1) {
+    $ln = 0;
+    %seen = ();
+    my @matches = ();
+    if (!@ARGV) {
+	# Skip to next iteration of loop.
+    } elsif ($opt{exact}) {
+	@matches = ();
+	for my $path (@ARGV) {
+	    if (File::Spec->file_name_is_absolute($path)) {
+		push(@matches, $path);
+	    } else {
+		# Consider all possible permutations of the supplied
+		# basename and the known IWDs.
+		push(@matches,
+		    map {File::Spec->rel2abs($path, $_)} $crdb->iwd);
+	    }
+	}
+    } else {
+       @matches = $crdb->matches(@ARGV);
+    }
+
+    for (@matches) {
+	print(++$ln, ' ') if $opt{number};
+	print $_, $opt{backward} ? ' <=' : ' =>', "\n";
+	whouses($crdb, 1, $_);
+    }
+
+} continue {
+    last unless $opt{interactive};
+    print STDERR "\n>> ";
+    my $line = <STDIN>;
+    last if !$line;
+    chomp $line;
+    @ARGV = split ' ', $line;
+    next if !@ARGV;
+    last if $ARGV[0] =~ m%(?:q|quit)%i;
+    if ($ARGV[0] eq '?') {
+	my %filter = map { $_ => 1 }
+	    map { (m%\W*(\w+)%)[0] }
+		@interopts;
+	my @current = map { "-$_='$opt{$_}'" }
+	    grep { exists $filter{$_} }
+		keys %opt;
+	usage(0);
+	print "\nCURRENT: @current\n";
+	@ARGV = ();
+    } else {
+	@ARGV = () if !GetOptions(\%opt, @interopts);
+    }
 }
 
 exit 0;
@@ -157,7 +152,7 @@ some additional sample usages with explanations:
 
   whouses foobar.h
 
-Shows all DO's that make use of any file matching /foobar.h/.
+Shows all DOs that make use of any file matching /foobar.h/.
 
   whouses -recurse foobar.h
 
@@ -165,8 +160,8 @@ Same as above but follows the chain of derived files recursively.
 
   whouses -exact foobar.h
 
-Shows all DO's that make use of the specified file. The C<-exact> flag
-suppresses pattern matching and shows only DO's which reference the
+Shows all DOs that make use of the specified file. The C<-exact> flag
+suppresses pattern matching and shows only DOs which reference the
 exact file.
 
 =head1 DESCRIPTION
@@ -182,9 +177,9 @@ from C<foo.c>.  You have a Makefile which compiles C<foo.c> to C<foo.o>
 and then links it to produce C<foo>. And let's further assume you've
 just done a build using clearmake.
 
-Thus, C<foo> is a DO which has a config record (I<CR>) showing how it
-was made. Whouses analyzes that CR and prints the data in easy-to-read
-indented textual format.  For instance:
+Thus, C<foo> is a derived object (I<DO>) which has a config record
+(I<CR>) showing how it was made. Whouses analyzes that CR and prints
+the data in easy-to-read indented textual format.  For instance:
 
 	% whouses -do foo foo.c
 	/vobs_sw/src/foo.c  =>
@@ -193,7 +188,7 @@ indented textual format.  For instance:
 The C<-do foo> points to the derived object from which to extract and
 analyze the CR; it will be implicit in the remaining examples.  The
 output indicates that C<foo.o B<uses> foo.c>, or in other words that
-C<foo.c> is a contributor to C<foo.o>. If we add the C<-recurse> flag:
+C<foo.c> is a I<contributor> to C<foo.o>. If we add the C<-recurse> flag:
 
 	% whouses -r foo.c
 	/vobs_sw/src/foo.c =>
@@ -210,20 +205,20 @@ how many generations removed they are. If we now add C<-terminals>
 Intermediate targets such as C<foo.o> are suppressed so we see only the
 "final" targets descended from C<foo.c>.
 
-We can also go in the other direction using C<-backwards>:
+We can also go in the other direction using C<-backward>:
 
 	% whouses -b -e foo
 	/vobs_sw/src/foo <=
 	  /vobs_sw/src/foo.o
 
 Which shows C<foo.o> as a progenitor of C<foo>. Note that the arrow
-(B<E<lt>=>) is turned around to indicate C<-backwards> mode. We also
-introduced the C<-exact> flag here. By default arguments to whouses
+(B<E<lt>=>) is turned around to indicate C<-backward> mode. We also
+introduced the C<-exact> flag here. By default, arguments to whouses
 are treated as patterns, not file names, and since C<foo> has no
-extension it would have matched C<foo.c> and C<foo.o> as well. Use
-of C<-exact> suppresses pattern matching.
+extension it would have matched C<foo.c> and C<foo.o> as well. Use of
+C<-exact> suppresses pattern matching.
 
-We can combine recursion with backwards mode:
+Of course we can go backward recursively as well:
 
 	% whouses -back -exact -recurse foo
 	/vobs_sw/src/foo <=
@@ -252,21 +247,17 @@ the C<-db> and C<-fmt> flags.
 
 The default save format is that of B<Data::Dumper>. It was chosen
 because it results in a nicely indented, human-readable text format
-file. Provision is made for subclassing to alternate storage formats,
-and subclasses for B<Storable> and B<Data::Denter> are provided as
-examples. Although the Storable format may be somewhat faster than
-the default, the real reason for the override capability is to allow an
-actual, fast database to be used.
+file.
 
-=head1 SELECTING DERIVED OBJECTS
+=head1 SELECTING DERIVED OBJECTS TO ANALYZE
 
 If a C<-do> flag is given, the CRs are taken from the specified derived
-object(s).  Multiple DO's may be specified with multiple C<-do> flags
+object(s).  Multiple DOs may be specified with multiple C<-do> flags
 or as a comma-separated list. Alternatively, if the C<CRDB_DO>
 environment variable exists, its value is used as if specified with
 C<-do>.
 
-If no DO's are specified directly, C<whouses> will look for stored DO
+If no DOs are specified directly, C<whouses> will look for stored DO
 data in files specified with C<-db> or the C<CRDB_DB> EV. The format is
 the same as above.
 
@@ -278,26 +269,26 @@ directory.
 
 As a special case, derived objects matching the Perl regular expression
 C</\.AUDIT/i> are ignored while traversing the recursive config spec.
-These are presumed to be I<meta-DO's> by convention, which aren't part
-of the build per se but rather pseudo-targets whose only purpose is to
-hold CR's which refer back to all real deliverables. Thus if you
-construct your Makefile to create a meta-DO, you might want to name it
-C<.AUDIT> or C<.prog.AUDIT> or something.
+These are presumed to be I<meta-DOs> by convention, which aren't part
+of the production build per se but rather pseudo-targets whose only
+purpose is to hold CRs referring back to all real deliverables. Thus
+if you construct your Makefile to create a meta-DO, you might want to
+name it C<.AUDIT> or C<.prog.AUDIT> or something.
 
 =head1 ClearCase::CRDB
 
 Most of the logic is actually in the C<ClearCase::CRDB> module; the
-C<whouses> program is just a wrapper that uses the module. It's done
+C<whouses> program is just a wrapper which uses the module. It's done
 this way so ClearCase::CRDB can provide an API for other potential
 tools which need to do CR analysis.
 
 =head1 TRUE CODE ANALYSIS COMPARED
 
-Whouses can best be described by comparison with "real" impact analysis
-products. There are a number of such tools on the market, for example
-SNiFF+ from WindRiver.  Typically these work by parsing the source code
-into some database representation which they can then analyze. It's a
-powerful technique but entails some tradeoffs:
+Whouses is somewhat different from "real" impact analysis products.
+There are a number of such tools on the market, for example SNiFF+ from
+WindRiver.  Typically these work by parsing the source code into some
+database representation which they can then analyze. It's a powerful
+technique but entails some tradeoffs:
 
 =head2 MINUSES
 
@@ -311,11 +302,10 @@ added.
 
 =item *
 
-A corollary of the above is that this tool requires lot of work by
-expert programmers. Thus the tools tend to be large, complex and
-expensive. Note: there is also I<cscope> which is free, and maybe
-others. But as the name implies I<cscope> is limited to C-like
-languages.
+A corollary of the above is that it requires lot of work by expert
+programmers. Thus the tools tend to be large, complex and expensive.
+Note: there is also I<cscope> which is free, and maybe others. But as
+the name implies I<cscope> is limited to C-like languages.
 
 =item *
 
@@ -325,9 +315,9 @@ may not be bug-for-bug compatible with the compiler.
 
 =item *
 
-Also, since analysis basically entails compiling the code,
-analysis of a large code base can take a long time,
-potentially as long or longer than actually building it.
+Also, since analysis basically entails compiling the code, analysis of
+a large code base can take a long time, potentially as long or longer
+than actually building it.
 
 =item *
 
@@ -378,7 +368,7 @@ David Boyce <dsbperl AT boyski.com>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000-2001 David Boyce. All rights reserved.  This Perl
+Copyright (c) 2000-2006 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute and/or modify it under
 the same terms as Perl itself.
 
@@ -398,6 +388,6 @@ appears to work fine in limited testing.
 
 =head1 SEE ALSO
 
-perl(1), ClearCase::CRDB(3)
+perl(1), ClearCase::CRDB(3), C<cleartool man catcr>
 
 =cut
